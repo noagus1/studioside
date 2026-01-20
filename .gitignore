@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+pnpm-lock.yaml
+npm-debug.log*
+
+# next.js build output
+.next/
+out/
+dist/
+
+# supabase
+.supabase/
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+supabase/migrations/.meta/
+
+# env files
+.env
+.env.local
+.env.*.local
+
+# mac
+.DS_Store
+
+# production
+*.log
