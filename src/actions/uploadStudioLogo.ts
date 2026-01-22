@@ -73,7 +73,7 @@ export async function uploadStudioLogo(
 
   // Check if user is owner or admin
   const { data: membership, error: membershipError } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)

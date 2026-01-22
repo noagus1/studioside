@@ -2,9 +2,7 @@
 'use server'
 
 import { getSupabaseClient } from '@/lib/supabase/serverClient'
-import { calculateInvoiceTotals } from '@/lib/invoices/calculateTotals'
 import { getCurrentStudioId } from '@/lib/cookies/currentStudio'
-import type { InvoiceStatus } from '@/types/db'
 import type { InvoiceInput, InvoiceListItem, InvoiceWithItems } from '@/types/invoice'
 
 type InvoiceActionError = {
@@ -64,7 +62,7 @@ async function getContext(requireAdmin = false): Promise<ContextResult> {
   }
 
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -93,82 +91,54 @@ export async function getInvoices(): Promise<GetInvoicesResult | InvoiceActionEr
   if ('error' in ctx) return ctx
 
   const { supabase, studioId } = ctx
-  const { data: draftData, error: draftError } = await supabase
-    .from('invoice_drafts')
-    .select('*, client:clients(name)')
+  const { data: invoiceData, error: invoiceError } = await supabase
+    .from('invoice_master')
+    .select(
+      'id, studio_id, client_id, invoice_number, issue_date, due_date, currency, memo, notes, customer_name, customer_email, payment_link_url, pdf_url, stripe_payment_intent_id, stripe_checkout_session_id, issued_at, paid_at, created_by, created_at, updated_at, client:clients(name), invoice_details(total_cents)'
+    )
     .eq('studio_id', studioId)
     .order('created_at', { ascending: false })
 
-  if (draftError) {
+  if (invoiceError) {
     return {
       error: 'DATABASE_ERROR',
-      message: `Failed to fetch drafts: ${draftError.message}`,
+      message: `Failed to fetch invoices: ${invoiceError.message}`,
     }
   }
 
-  const { data: issuedData, error: issuedError } = await supabase
-    .from('invoice_master')
-    .select(
-      'id, studio_id, client_id, invoice_number, issued_at, created_at, pdf_url, created_by, client:clients(name), invoice_details(total_cents)'
-    )
-    .eq('studio_id', studioId)
-    .order('issued_at', { ascending: false })
-
-  if (issuedError) {
-    return {
-      error: 'DATABASE_ERROR',
-      message: `Failed to fetch issued invoices: ${issuedError.message}`,
-    }
-  }
-
-  const drafts: InvoiceListItem[] = (draftData || []).map((row: any) => ({
-    ...(row as any),
-    client_name: row.customer_name ?? row.client?.name ?? null,
-  }))
-
-  const issued: InvoiceListItem[] = (issuedData || []).map((row: any) => {
+  const invoices: InvoiceListItem[] = (invoiceData || []).map((row: any) => {
     const totalCents = (row.invoice_details || []).reduce(
       (acc: number, detail: any) => acc + Number(detail.total_cents ?? 0),
       0
     )
     const total = totalCents / 100
-    const issuedAt = row.issued_at || row.created_at
 
     return {
       id: row.id,
       studio_id: row.studio_id,
       client_id: row.client_id,
       invoice_number: row.invoice_number,
-      status: 'sent',
-      currency: 'usd',
-      issue_date: issuedAt,
-      due_date: null,
-      subtotal: total,
-      tax_total: 0,
-      discount_total: 0,
-      total,
-      memo: null,
-      notes: null,
-      payment_link_url: null,
-      pdf_url: row.pdf_url,
-      stripe_payment_intent_id: null,
-      stripe_checkout_session_id: null,
-      metadata: {},
-      customer_name: null,
-      customer_email: null,
-      sent_at: issuedAt,
-      paid_at: null,
+      issue_date: row.issue_date,
+      due_date: row.due_date,
+      currency: row.currency || 'usd',
+      memo: row.memo ?? null,
+      notes: row.notes ?? null,
+      payment_link_url: row.payment_link_url ?? null,
+      pdf_url: row.pdf_url ?? null,
+      stripe_payment_intent_id: row.stripe_payment_intent_id ?? null,
+      stripe_checkout_session_id: row.stripe_checkout_session_id ?? null,
+      customer_name: row.customer_name ?? null,
+      customer_email: row.customer_email ?? null,
+      issued_at: row.issued_at ?? null,
+      paid_at: row.paid_at ?? null,
       created_by: row.created_by ?? null,
       created_at: row.created_at,
-      updated_at: row.created_at,
-      client_name: row.client?.name ?? null,
+      updated_at: row.updated_at ?? row.created_at,
+      client_name: row.customer_name ?? row.client?.name ?? null,
+      status: getLifecycleStatus(row),
+      subtotal: total,
+      total,
     }
-  })
-
-  const invoices = [...drafts, ...issued].sort((a, b) => {
-    const dateA = new Date(a.created_at || a.issue_date || '').getTime()
-    const dateB = new Date(b.created_at || b.issue_date || '').getTime()
-    return dateB - dateA
   })
 
   return { success: true, invoices }
@@ -180,18 +150,31 @@ export async function createDraftInvoice(): Promise<CreateInvoiceResult | Invoic
 
   const { supabase, studioId, userId } = ctx
 
+  const issueDate = new Date().toISOString().slice(0, 10)
+  const { data: nextNumber, error: numberError } = await supabase.rpc('next_invoice_number', {
+    in_studio_id: studioId,
+  })
+
+  if (numberError || !nextNumber) {
+    return {
+      error: 'DATABASE_ERROR',
+      message: `Failed to generate invoice number: ${numberError?.message || 'Unknown error'}`,
+    }
+  }
+
   const { data, error } = await supabase
-    .from('invoice_drafts')
+    .from('invoice_master')
     .insert({
       studio_id: studioId,
-      status: 'draft',
-      issue_date: new Date().toISOString().slice(0, 10),
+      client_id: null,
+      invoice_number: nextNumber,
+      period_start: issueDate,
+      period_end: issueDate,
+      issue_date: issueDate,
       due_date: null,
-      subtotal: 0,
-      tax_total: 0,
-      discount_total: 0,
-      total: 0,
       currency: 'usd',
+      issued_at: null,
+      pdf_url: null,
       created_by: userId,
     })
     .select('id')
@@ -228,8 +211,16 @@ export async function saveInvoice(input: InvoiceInput): Promise<SaveInvoiceResul
     }
   }
 
-  const totals = calculateInvoiceTotals(input.items)
+  if (!input.client_id) {
+    return {
+      error: 'VALIDATION_ERROR',
+      message: 'Select a client before saving the invoice',
+    }
+  }
 
+  const issueDate = input.issue_date || new Date().toISOString().slice(0, 10)
+  const dueDate = input.due_date ?? null
+  const periodEnd = dueDate || issueDate
   const invoicePayload = {
     studio_id: studioId,
     client_id: input.client_id,
@@ -238,13 +229,10 @@ export async function saveInvoice(input: InvoiceInput): Promise<SaveInvoiceResul
     memo: input.memo ?? null,
     notes: input.notes ?? null,
     currency: input.currency || 'usd',
-    issue_date: input.issue_date || new Date().toISOString().slice(0, 10),
-    due_date: input.due_date ?? null,
-    status: input.status || 'draft',
-    subtotal: totals.subtotal,
-    tax_total: totals.tax_total,
-    discount_total: totals.discount_total,
-    total: totals.total,
+    issue_date: issueDate,
+    due_date: dueDate,
+    period_start: issueDate,
+    period_end: periodEnd,
     created_by: userId,
   }
 
@@ -253,7 +241,7 @@ export async function saveInvoice(input: InvoiceInput): Promise<SaveInvoiceResul
   if (input.id) {
     invoiceId = input.id
     const { data: existing } = await supabase
-      .from('invoice_drafts')
+      .from('invoice_master')
       .select('id, studio_id')
       .eq('id', invoiceId)
       .maybeSingle()
@@ -263,7 +251,7 @@ export async function saveInvoice(input: InvoiceInput): Promise<SaveInvoiceResul
     }
 
     const { error: updateError } = await supabase
-      .from('invoice_drafts')
+      .from('invoice_master')
       .update(invoicePayload)
       .eq('id', invoiceId)
 
@@ -274,10 +262,10 @@ export async function saveInvoice(input: InvoiceInput): Promise<SaveInvoiceResul
       }
     }
 
-    await supabase.from('invoice_draft_items').delete().eq('invoice_id', invoiceId)
+    await supabase.from('invoice_details').delete().eq('invoice_id', invoiceId)
   } else {
     const { data, error: insertError } = await supabase
-      .from('invoice_drafts')
+      .from('invoice_master')
       .insert(invoicePayload)
       .select('id')
       .maybeSingle()
@@ -292,18 +280,36 @@ export async function saveInvoice(input: InvoiceInput): Promise<SaveInvoiceResul
     invoiceId = data.id
   }
 
-  const itemsPayload = input.items.map((item, index) => ({
-    invoice_id: invoiceId,
-    name: item.name || 'Item',
-    description: item.description || null,
-    quantity: Number(item.quantity) || 0,
-    unit_amount: Number(item.unit_amount) || 0,
-    tax_rate: Number(item.tax_rate || 0),
-    discount_amount: Number(item.discount_amount || 0),
-    sort_order: item.sort_order ?? index,
-  }))
+  let toInvoiceStatusId: string
+  try {
+    ;({ toInvoiceStatusId } = await getInvoiceStatusIds(supabase))
+  } catch (err) {
+    return {
+      error: 'DATABASE_ERROR',
+      message: err instanceof Error ? err.message : 'Failed to load invoice statuses',
+    }
+  }
+  const itemsPayload = input.items.map((item, index) => {
+    const quantity = Number(item.quantity) || 0
+    const unitAmount = Number(item.unit_amount) || 0
+    const unitPriceCents = Math.round(unitAmount * 100)
+    const totalCents = Math.round(quantity * unitAmount * 100)
 
-  const { error: itemsError } = await supabase.from('invoice_draft_items').insert(itemsPayload)
+    return {
+      studio_id: studioId,
+      client_id: input.client_id,
+      invoice_id: invoiceId,
+      description: item.name || 'Item',
+      quantity,
+      unit_price_cents: unitPriceCents,
+      total_cents: totalCents,
+      status_id: toInvoiceStatusId,
+      service_date: issueDate,
+      sort_order: item.sort_order ?? index,
+    }
+  })
+
+  const { error: itemsError } = await supabase.from('invoice_details').insert(itemsPayload)
   if (itemsError) {
     return {
       error: 'DATABASE_ERROR',
@@ -323,9 +329,18 @@ export async function sendInvoice(invoiceId: string): Promise<SaveInvoiceResult 
 
   const { supabase, studioId } = ctx
 
+  let invoicedStatusId: string
+  try {
+    ;({ invoicedStatusId } = await getInvoiceStatusIds(supabase))
+  } catch (err) {
+    return {
+      error: 'DATABASE_ERROR',
+      message: err instanceof Error ? err.message : 'Failed to load invoice statuses',
+    }
+  }
   const { data, error } = await supabase
-    .from('invoice_drafts')
-    .update({ status: 'sent', sent_at: new Date().toISOString() })
+    .from('invoice_master')
+    .update({ issued_at: new Date().toISOString() })
     .eq('id', invoiceId)
     .eq('studio_id', studioId)
     .select('id')
@@ -338,6 +353,19 @@ export async function sendInvoice(invoiceId: string): Promise<SaveInvoiceResult 
     }
   }
 
+  const { error: detailError } = await supabase
+    .from('invoice_details')
+    .update({ status_id: invoicedStatusId })
+    .eq('invoice_id', invoiceId)
+    .eq('studio_id', studioId)
+
+  if (detailError) {
+    return {
+      error: 'DATABASE_ERROR',
+      message: `Failed to issue invoice items: ${detailError.message}`,
+    }
+  }
+
   const invoiceResult = await fetchInvoiceWithItems(supabase, invoiceId)
   if ('error' in invoiceResult) return invoiceResult
 
@@ -346,21 +374,23 @@ export async function sendInvoice(invoiceId: string): Promise<SaveInvoiceResult 
 
 export async function updateInvoiceStatus(
   invoiceId: string,
-  status: InvoiceStatus
+  status: 'paid'
 ): Promise<SaveInvoiceResult | InvoiceActionError> {
   const ctx = await getContext(true)
   if ('error' in ctx) return ctx
 
   const { supabase, studioId } = ctx
 
-  const updates: Record<string, any> = { status }
-  if (status === 'paid') {
-    updates.paid_at = new Date().toISOString()
+  if (status !== 'paid') {
+    return {
+      error: 'VALIDATION_ERROR',
+      message: 'Only paid status updates are supported in the reset invoice model.',
+    }
   }
 
   const { data, error } = await supabase
-    .from('invoice_drafts')
-    .update(updates)
+    .from('invoice_master')
+    .update({ paid_at: new Date().toISOString() })
     .eq('id', invoiceId)
     .eq('studio_id', studioId)
     .select('id')
@@ -379,110 +409,78 @@ export async function updateInvoiceStatus(
   return { success: true, invoice: invoiceResult.invoice }
 }
 
-export async function createInvoicePaymentLink(
-  invoiceId: string
-): Promise<SaveInvoiceResult | InvoiceActionError> {
-  return {
-    error: 'DATABASE_ERROR',
-    message: 'Payment link generation is not available for the new invoice model.',
-  }
-}
-
-export async function goToInvoicePayment(invoiceId: string): Promise<void> {
-  throw new Error('Invoice payment links are not available in the new invoice model.')
-}
-
 async function fetchInvoiceWithItems(
   supabase: Awaited<ReturnType<typeof getSupabaseClient>>,
   invoiceId: string
 ): Promise<GetInvoiceResult | InvoiceActionError> {
-  const { data: draft, error: draftError } = await supabase
-    .from('invoice_drafts')
-    .select('*, invoice_draft_items(*), client:clients(name)')
-    .eq('id', invoiceId)
-    .maybeSingle()
-
-  if (draftError) {
-    return {
-      error: 'DATABASE_ERROR',
-      message: `Failed to fetch invoice: ${draftError.message}`,
-    }
-  }
-
-  if (draft) {
-    const items = ((draft as any).invoice_draft_items || []).sort(
-      (a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
-    )
-
-    return {
-      success: true,
-      invoice: {
-        ...(draft as any),
-        client_name: (draft as any).customer_name ?? (draft as any).client?.name ?? null,
-        items,
-      },
-    }
-  }
-
-  const { data: issued, error: issuedError } = await supabase
+  const { data: invoice, error: invoiceError } = await supabase
     .from('invoice_master')
     .select(
-      'id, studio_id, client_id, invoice_number, issued_at, created_at, pdf_url, created_by, client:clients(name), invoice_details(id, description, quantity, unit_price_cents, total_cents, service_date)'
+      'id, studio_id, client_id, invoice_number, issue_date, due_date, currency, memo, notes, customer_name, customer_email, payment_link_url, pdf_url, stripe_payment_intent_id, stripe_checkout_session_id, issued_at, paid_at, created_by, created_at, updated_at, invoice_details(id, description, quantity, unit_price_cents, total_cents, service_date, sort_order)'
     )
     .eq('id', invoiceId)
     .maybeSingle()
 
-  if (issuedError) {
+  if (invoiceError) {
     return {
       error: 'DATABASE_ERROR',
-      message: `Failed to fetch invoice: ${issuedError.message}`,
+      message: `Failed to fetch invoice: ${invoiceError.message}`,
     }
   }
 
-  if (!issued) {
+  if (!invoice) {
     return { error: 'NOT_FOUND', message: 'Invoice not found' }
   }
 
-  const details = (issued as any).invoice_details || []
+  const details = (invoice as any).invoice_details || []
   const items = details
     .map((d: any, index: number) => ({
       id: d.id,
       name: d.description || 'Charge',
-      description: d.description || null,
       quantity: Number(d.quantity ?? 0),
       unit_amount: Number(d.unit_price_cents ?? 0) / 100,
-      tax_rate: 0,
-      discount_amount: 0,
-      sort_order: index,
-      service_date: d.service_date,
-      total_cents: d.total_cents,
+      sort_order: d.sort_order ?? index,
     }))
     .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 
   const totalCents = details.reduce((acc: number, d: any) => acc + Number(d.total_cents ?? 0), 0)
   const total = totalCents / 100
-  const issuedAt = (issued as any).issued_at || (issued as any).created_at
 
   return {
     success: true,
     invoice: {
-      ...(issued as any),
-      status: 'sent',
-      currency: 'usd',
-      issue_date: issuedAt,
-      due_date: null,
+      ...(invoice as any),
+      status: getLifecycleStatus(invoice),
       subtotal: total,
-      tax_total: 0,
-      discount_total: 0,
       total,
-      payment_link_url: null,
-      customer_name: null,
-      customer_email: null,
-      sent_at: issuedAt,
-      paid_at: null,
-      updated_at: (issued as any).created_at,
-      client_name: (issued as any).client?.name ?? null,
       items,
     },
   }
+}
+
+async function getInvoiceStatusIds(
+  supabase: Awaited<ReturnType<typeof getSupabaseClient>>
+): Promise<{ toInvoiceStatusId: string; invoicedStatusId: string }> {
+  const { data, error } = await supabase
+    .from('invoice_statuses')
+    .select('id, name')
+
+  if (error || !data) {
+    throw new Error(error?.message || 'Failed to load invoice statuses')
+  }
+
+  const toInvoice = data.find((row) => row.name === 'to_invoice')
+  const invoiced = data.find((row) => row.name === 'invoiced')
+
+  if (!toInvoice || !invoiced) {
+    throw new Error('Invoice statuses not seeded')
+  }
+
+  return { toInvoiceStatusId: toInvoice.id, invoicedStatusId: invoiced.id }
+}
+
+function getLifecycleStatus(invoice: { issued_at?: string | null; paid_at?: string | null }) {
+  if (invoice.paid_at) return 'paid'
+  if (invoice.issued_at) return 'sent'
+  return 'draft'
 }

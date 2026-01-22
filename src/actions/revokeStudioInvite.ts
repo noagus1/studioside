@@ -83,7 +83,7 @@ export async function revokeStudioInvite(
 
   // Verify user is a member of the studio and has permission (owner/admin)
   const { data: membership, error: membershipError } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role, status')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)

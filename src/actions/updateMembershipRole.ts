@@ -56,7 +56,7 @@ export async function updateMembershipRole(
   }
 
   const { data: membership, error: membershipError } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role, status')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -79,7 +79,7 @@ export async function updateMembershipRole(
   }
 
   const { data: targetMembership, error: targetError } = await admin
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id, studio_id, role, status, user_id')
     .eq('id', membershipId)
     .maybeSingle()
@@ -114,7 +114,7 @@ export async function updateMembershipRole(
   }
 
   const { error: updateError } = await admin
-    .from('studio_memberships')
+    .from('studio_users')
     .update({ role })
     .eq('id', membershipId)
 

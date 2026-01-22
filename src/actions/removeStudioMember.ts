@@ -87,7 +87,7 @@ export async function removeStudioMember(
 
   // Verify user is a member of the studio and is owner
   const { data: membership, error: membershipError } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role, status')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -128,7 +128,7 @@ export async function removeStudioMember(
   // Use admin client to bypass RLS since we've already verified the user is an owner
   // This is safe because we've verified ownership above
   const { data: targetMembership, error: membershipCheckError } = await admin
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id, studio_id, user_id, role, status')
     .eq('id', memberId)
     .single()
@@ -187,7 +187,7 @@ export async function removeStudioMember(
 
   // Soft-remove the membership to keep history
   const { error: updateError } = await admin
-    .from('studio_memberships')
+    .from('studio_users')
     .update({ status: 'removed' })
     .eq('id', memberId)
 

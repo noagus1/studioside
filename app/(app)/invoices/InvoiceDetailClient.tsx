@@ -19,12 +19,9 @@ import {
   saveInvoice,
   sendInvoice,
   updateInvoiceStatus,
-  createInvoicePaymentLink,
-  goToInvoicePayment,
 } from './actions'
 import type { Client } from '../sessions/actions'
-import type { InvoiceWithItems, InvoiceItemInput } from '@/types/invoice'
-import type { InvoiceStatus } from '@/types/db'
+import type { InvoiceWithItems, InvoiceItemInput, InvoiceLifecycleStatus } from '@/types/invoice'
 
 interface Props {
   invoice: InvoiceWithItems
@@ -38,11 +35,8 @@ export function InvoiceDetailClient({ invoice: initialInvoice, clients }: Props)
       ? initialInvoice.items.map((item) => ({
           id: item.id,
           name: item.name,
-          description: item.description || '',
           quantity: item.quantity,
           unit_amount: item.unit_amount,
-          tax_rate: item.tax_rate,
-          discount_amount: item.discount_amount,
           sort_order: item.sort_order,
         }))
       : [
@@ -50,8 +44,6 @@ export function InvoiceDetailClient({ invoice: initialInvoice, clients }: Props)
             name: '',
             quantity: 1,
             unit_amount: 0,
-            tax_rate: 0,
-            discount_amount: 0,
           },
         ]
   )
@@ -89,8 +81,6 @@ export function InvoiceDetailClient({ invoice: initialInvoice, clients }: Props)
         name: '',
         quantity: 1,
         unit_amount: 0,
-        tax_rate: 0,
-        discount_amount: 0,
       },
     ])
   }
@@ -131,11 +121,8 @@ export function InvoiceDetailClient({ invoice: initialInvoice, clients }: Props)
         result.invoice.items.map((item) => ({
           id: item.id,
           name: item.name,
-          description: item.description || '',
           quantity: item.quantity,
           unit_amount: item.unit_amount,
-          tax_rate: item.tax_rate,
-          discount_amount: item.discount_amount,
           sort_order: item.sort_order,
         }))
       )
@@ -171,30 +158,6 @@ export function InvoiceDetailClient({ invoice: initialInvoice, clients }: Props)
     })
   }
 
-  const handlePaymentLink = () => {
-    setMessage(null)
-    setError(null)
-    startTransition(async () => {
-      const result = await createInvoicePaymentLink(invoice.id)
-      if ('error' in result) {
-        setError(result.message)
-        return
-      }
-      setInvoice(result.invoice)
-      setMessage('Payment link ready')
-    })
-  }
-
-  const handlePayNow = () => {
-    startTransition(async () => {
-      try {
-        await goToInvoicePayment(invoice.id)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to open payment link')
-      }
-    })
-  }
-
   return (
     <div className="space-y-6">
       <Link href="/invoices" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
@@ -216,14 +179,8 @@ export function InvoiceDetailClient({ invoice: initialInvoice, clients }: Props)
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handlePaymentLink} disabled={isPending}>
-            {invoice.payment_link_url ? 'Refresh link' : 'Create payment link'}
-          </Button>
           <Button variant="outline" onClick={handleSend} disabled={isPending}>
             Send
-          </Button>
-          <Button variant="secondary" onClick={handlePayNow} disabled={isPending || !invoice.payment_link_url}>
-            Pay
           </Button>
           <Button onClick={handleMarkPaid} disabled={isPending}>
             Mark paid
@@ -313,21 +270,15 @@ export function InvoiceDetailClient({ invoice: initialInvoice, clients }: Props)
                 {items.map((item, index) => (
                   <Card key={item.id || index} className="border shadow-none">
                     <CardContent className="p-4 space-y-3">
-                      <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-3 sm:grid-cols-1">
                         <Input
-                          placeholder="Name"
+                          placeholder="Description"
                           readOnly={!isDraft}
                           value={item.name}
                           onChange={(e) => handleItemChange(index, 'name', e.target.value)}
                         />
-                        <Input
-                          placeholder="Description (optional)"
-                          readOnly={!isDraft}
-                          value={item.description || ''}
-                          onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                        />
                       </div>
-                      <div className="grid gap-3 sm:grid-cols-4">
+                      <div className="grid gap-3 sm:grid-cols-2">
                         <Input
                           type="number"
                           min={0}
@@ -345,24 +296,6 @@ export function InvoiceDetailClient({ invoice: initialInvoice, clients }: Props)
                           readOnly={!isDraft}
                           value={item.unit_amount}
                           onChange={(e) => handleItemChange(index, 'unit_amount', e.target.value)}
-                        />
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          placeholder="Tax %"
-                          readOnly={!isDraft}
-                          value={item.tax_rate}
-                          onChange={(e) => handleItemChange(index, 'tax_rate', e.target.value)}
-                        />
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          placeholder="Discount"
-                          readOnly={!isDraft}
-                          value={item.discount_amount}
-                          onChange={(e) => handleItemChange(index, 'discount_amount', e.target.value)}
                         />
                       </div>
                       <div className="flex justify-end">
@@ -406,10 +339,6 @@ export function InvoiceDetailClient({ invoice: initialInvoice, clients }: Props)
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <Row label="Subtotal" value={formatCurrency(totals.subtotal, invoice.currency)} />
-            <Row label="Tax" value={formatCurrency(totals.tax_total, invoice.currency)} />
-            {totals.discount_total > 0 && (
-              <Row label="Discounts" value={`-${formatCurrency(totals.discount_total, invoice.currency)}`} />
-            )}
             <Row
               label="Total"
               value={formatCurrency(totals.total, invoice.currency)}
@@ -417,17 +346,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, clients }: Props)
             />
             <Row label="Status" value={getStatusLabel(invoice.status)} />
             <Row label="Due date" value={invoice.due_date || 'N/A'} />
-            {invoice.payment_link_url && (
-              <Row
-                label="Payment link"
-                value={
-                  <a className="text-blue-600 underline" href={invoice.payment_link_url} target="_blank" rel="noreferrer">
-                    Open
-                  </a>
-                }
-              />
-            )}
-            {invoice.sent_at && <Row label="Sent" value={new Date(invoice.sent_at).toLocaleString()} />}
+            {invoice.issued_at && <Row label="Issued" value={new Date(invoice.issued_at).toLocaleString()} />}
             {invoice.paid_at && <Row label="Paid" value={new Date(invoice.paid_at).toLocaleString()} />}
           </CardContent>
         </Card>
@@ -436,17 +355,13 @@ export function InvoiceDetailClient({ invoice: initialInvoice, clients }: Props)
   )
 }
 
-function StatusPill({ status }: { status: InvoiceStatus }) {
+function StatusPill({ status }: { status: InvoiceLifecycleStatus }) {
   const label = getStatusLabel(status)
   const color =
     status === 'paid'
       ? 'bg-emerald-100 text-emerald-700'
       : status === 'sent'
       ? 'bg-blue-100 text-blue-700'
-      : status === 'overdue'
-      ? 'bg-red-100 text-red-700'
-      : status === 'void'
-      ? 'bg-gray-200 text-gray-700'
       : 'bg-amber-100 text-amber-700'
 
   return (
@@ -465,26 +380,18 @@ function Row({ label, value, className }: { label: string; value: ReactNode; cla
   )
 }
 
-function getStatusLabel(status: InvoiceStatus) {
+function getStatusLabel(status: InvoiceLifecycleStatus) {
   if (status === 'draft') return 'Draft'
   if (status === 'paid') return 'Paid'
-  if (status === 'void') return 'Void'
   return 'Issued'
 }
 
 function calculateTotals(items: InvoiceItemInput[]) {
   const subtotal = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.unit_amount || 0), 0)
-  const tax_total = items.reduce(
-    (sum, item) => sum + (item.quantity || 0) * (item.unit_amount || 0) * ((item.tax_rate || 0) / 100),
-    0
-  )
-  const discount_total = items.reduce((sum, item) => sum + (item.discount_amount || 0), 0)
-  const total = Math.max(0, subtotal + tax_total - discount_total)
+  const total = Math.max(0, subtotal)
 
   return {
     subtotal: round(subtotal),
-    tax_total: round(tax_total),
-    discount_total: round(discount_total),
     total: round(total),
   }
 }

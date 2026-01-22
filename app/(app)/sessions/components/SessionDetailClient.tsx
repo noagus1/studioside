@@ -18,6 +18,9 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { SessionDetailsDialog } from './SessionDetailsDialog'
 import { SessionNotesDialog } from './SessionNotesDialog'
+import { SessionDateDialog } from './SessionDateDialog'
+import { SessionTimeDialog } from './SessionTimeDialog'
+import { SessionRoomDialog } from './SessionRoomDialog'
 import { GearListDisplay, SessionGearDialog } from './SessionGearDialog'
 import { deleteSession, updateSessionStatus } from '../actions'
 import type { Session, SessionResource } from '@/types/session'
@@ -47,6 +50,9 @@ interface SessionDetailClientProps {
 export function SessionDetailClient({ session, timeZone }: SessionDetailClientProps) {
   const router = useRouter()
   const [activeDialog, setActiveDialog] = React.useState<'details' | 'resources' | 'notes' | null>(null)
+  const [dateDialogOpen, setDateDialogOpen] = React.useState(false)
+  const [timeDialogOpen, setTimeDialogOpen] = React.useState(false)
+  const [roomDialogOpen, setRoomDialogOpen] = React.useState(false)
   const [expanded, setExpanded] = React.useState<
     Record<'details' | 'resources' | 'notes' | 'assigned-team', boolean>
   >({
@@ -97,6 +103,7 @@ export function SessionDetailClient({ session, timeZone }: SessionDetailClientPr
 
   const dayLabel = formatSessionDay(session, { timeZone, includeYear: true })
   const timeLabel = formatSessionTime(session, { timeZone })
+  const roomLabel = session.room?.name || 'Select room'
   const engineerLabel = session.engineer?.full_name || session.engineer?.email
   const assignedTeam: AssignedTeamDisplay = React.useMemo(() => {
     const engineerName = session.engineer?.full_name || session.engineer?.email
@@ -287,20 +294,33 @@ export function SessionDetailClient({ session, timeZone }: SessionDetailClientPr
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDateDialogOpen(true)}
+                className="inline-flex items-center gap-2 rounded-md px-1 -mx-1 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label="Edit session date"
+              >
                 <CalendarClock className="h-4 w-4" />
                 {dayLabel}
-              </span>
-              <span className="inline-flex items-center gap-2">
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimeDialogOpen(true)}
+                className="inline-flex items-center gap-2 rounded-md px-1 -mx-1 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label="Edit session time"
+              >
                 <Clock className="h-4 w-4" />
                 {timeLabel}
-              </span>
-              {session.room?.name && (
-                <span className="inline-flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  {session.room.name}
-                </span>
-              )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRoomDialogOpen(true)}
+                className="inline-flex items-center gap-2 rounded-md px-1 -mx-1 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label="Edit session room"
+              >
+                <MapPin className="h-4 w-4" />
+                {roomLabel}
+              </button>
             </div>
           </div>
         </div>
@@ -444,6 +464,24 @@ export function SessionDetailClient({ session, timeZone }: SessionDetailClientPr
       <SessionDetailsDialog
         open={activeDialog === 'details'}
         onOpenChange={(open) => setActiveDialog(open ? 'details' : null)}
+        session={session}
+        onUpdated={handleUpdated}
+      />
+      <SessionDateDialog
+        open={dateDialogOpen}
+        onOpenChange={setDateDialogOpen}
+        session={session}
+        onUpdated={handleUpdated}
+      />
+      <SessionTimeDialog
+        open={timeDialogOpen}
+        onOpenChange={setTimeDialogOpen}
+        session={session}
+        onUpdated={handleUpdated}
+      />
+      <SessionRoomDialog
+        open={roomDialogOpen}
+        onOpenChange={setRoomDialogOpen}
         session={session}
         onUpdated={handleUpdated}
       />

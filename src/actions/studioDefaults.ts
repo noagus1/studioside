@@ -86,7 +86,7 @@ export async function getStudioDefaults(): Promise<GetStudioDefaultsResult | Get
   }
 
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -157,7 +157,7 @@ export async function updateStudioDefaults(
   }
 
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)

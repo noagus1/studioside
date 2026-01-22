@@ -26,7 +26,7 @@ const linkQuery = {
 }
 
 const mockAdminFrom = vi.fn((table: string) => {
-  if (table === 'studio_memberships') return membershipQuery as any
+  if (table === 'studio_users') return membershipQuery as any
   if (table === 'studio_invitations') return invitationUpdate as any
   if (table === 'studio_invite_links') return linkQuery as any
   return {

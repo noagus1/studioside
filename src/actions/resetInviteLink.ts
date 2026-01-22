@@ -49,7 +49,7 @@ export async function resetInviteLink(): Promise<ResetInviteLinkResult | ResetIn
   }
 
   const { data: membership, error: membershipError } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role, status')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)

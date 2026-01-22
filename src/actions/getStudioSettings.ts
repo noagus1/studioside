@@ -70,7 +70,7 @@ export async function getStudioSettings(): Promise<StudioSettingsData | StudioSe
     // Query explicitly with both studio_id and user_id to ensure we get the correct membership
     // The UNIQUE constraint on (studio_id, user_id) ensures we get exactly one result
     supabase
-      .from('studio_memberships')
+      .from('studio_users')
       .select('role, studio_id, user_id')
       .eq('studio_id', studioId)
       .eq('user_id', user.id)
@@ -110,7 +110,7 @@ export async function getStudioSettings(): Promise<StudioSettingsData | StudioSe
   if (!membership) {
     // Debug: Check if user has any memberships at all
     const { data: allMemberships } = await supabase
-      .from('studio_memberships')
+      .from('studio_users')
       .select('studio_id, role, status')
       .eq('user_id', user.id)
     
@@ -144,7 +144,7 @@ export async function getStudioSettings(): Promise<StudioSettingsData | StudioSe
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin'
 
   const { count: memberCount, error: memberCountError } = await admin
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id', { count: 'exact', head: true })
     .eq('studio_id', studioId)
     .eq('status', 'active')

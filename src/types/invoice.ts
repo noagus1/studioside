@@ -4,24 +4,37 @@
  * Shared invoice interfaces for server actions and UI.
  */
 
-import type { Invoice, InvoiceItem, InvoiceStatus, Timestamp } from './db'
+import type { InvoiceMaster } from './db'
 
-export interface InvoiceWithItems extends Invoice {
-  items: InvoiceItem[]
+export type InvoiceLifecycleStatus = 'draft' | 'sent' | 'paid'
+
+export interface InvoiceItem {
+  id: string
+  name: string
+  quantity: number
+  unit_amount: number
+  sort_order: number
 }
 
-export interface InvoiceListItem extends Invoice {
+export interface InvoiceWithItems extends InvoiceMaster {
+  items: InvoiceItem[]
+  status: InvoiceLifecycleStatus
+  subtotal: number
+  total: number
+}
+
+export interface InvoiceListItem extends InvoiceMaster {
   client_name: string | null
+  status: InvoiceLifecycleStatus
+  subtotal: number
+  total: number
 }
 
 export interface InvoiceItemInput {
   id?: string
   name: string
-  description?: string | null
   quantity: number
   unit_amount: number
-  tax_rate?: number
-  discount_amount?: number
   sort_order?: number
 }
 
@@ -36,15 +49,6 @@ export interface InvoiceInput {
   issue_date?: string
   due_date?: string | null
   items: InvoiceItemInput[]
-  tax_total?: number
-  discount_total?: number
-  status?: InvoiceStatus
-}
-
-export interface InvoiceStatusHistoryEntry {
-  status: InvoiceStatus
-  changed_at: Timestamp
-  changed_by?: string | null
 }
 
 

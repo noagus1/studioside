@@ -19,6 +19,8 @@ import { getSupabaseClient } from '@/lib/supabase/client'
 import { setAuthSession } from '@/actions/setAuthSession'
 import { checkUserAuthState } from '@/actions/checkUserAuthState'
 import { createMagicLinkForExistingUser } from '@/actions/createMagicLinkForExistingUser'
+import { createUserWithPassword } from '@/actions/createUserWithPassword'
+import { updateUserProfile } from '@/actions/updateUserProfile'
 import { setHasPassword } from '@/actions/setHasPassword'
 import { getOnboardingRedirectPath } from '@/actions/getOnboardingRedirectPath'
 import { preserveInviteTokenFromPath } from '@/actions/preserveInviteToken'
@@ -26,7 +28,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { GoogleLogo } from '@/components/base/buttons/social-logos'
 
-type AuthStep = 'email' | 'password' | 'magic-link-sent'
+type AuthStep = 'email' | 'password' | 'signup' | 'magic-link-sent'
 
 export default function AuthForm() {
   const router = useRouter()
@@ -35,10 +37,12 @@ export default function AuthForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [email, setEmail] = useState('')
+  const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
-  const [userHasPassword, setUserHasPassword] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [isPasswordReset, setIsPasswordReset] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const intent = searchParams.get('intent')
 
   async function handleEmailSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -65,45 +69,49 @@ export default function AuthForm() {
 
       if (state.userExists && state.hasPassword) {
         // User exists with password - show password screen
-        setUserHasPassword(true)
         setStep('password')
         setIsLoading(false)
       } else if (state.userExists && !state.hasPassword) {
         // Existing account without password/profile completion - send to completion flow
-        const redirectParam = searchParams.get('redirect') || ''
-        // Preserve invite token if present in redirect param
-        if (redirectParam.includes('/join') && redirectParam.includes('token=')) {
-          await preserveInviteTokenFromPath(redirectParam)
-        }
-        
-        const origin =
-          typeof window !== 'undefined'
-            ? window.location.origin
-            : process.env.NEXT_PUBLIC_SITE_URL || ''
-        // Preserve the original redirect if it exists, otherwise go to complete-account
-        const nextPath = redirectParam || '/complete-account'
-        const redirectTo = origin
-          ? `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`
-          : `/auth/callback?next=${encodeURIComponent(nextPath)}`
-
-        const magicLink = await createMagicLinkForExistingUser(email, redirectTo)
-
-        if ('error' in magicLink) {
-          setError(magicLink.message)
-          setIsLoading(false)
-          return
-        }
-
-        // Navigate to the action link directly to establish a session without email
-        window.location.href = magicLink.actionLink
+        await handleExistingUserWithoutPassword()
       } else {
-        // User doesn't exist - send magic link to create account
-        await sendMagicLink(email)
+        // New user - show signup step
+        setStep('signup')
+        setIsLoading(false)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to check email')
       setIsLoading(false)
     }
+  }
+
+  async function handleExistingUserWithoutPassword() {
+    const redirectParam = searchParams.get('redirect') || ''
+    // Preserve invite token if present in redirect param
+    if (redirectParam.includes('/join') && redirectParam.includes('token=')) {
+      await preserveInviteTokenFromPath(redirectParam)
+    }
+
+    const origin =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_SITE_URL || ''
+    // Preserve the original redirect if it exists, otherwise go to complete-account
+    const nextPath = redirectParam || '/complete-account'
+    const redirectTo = origin
+      ? `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`
+      : `/auth/callback?next=${encodeURIComponent(nextPath)}`
+
+    const magicLink = await createMagicLinkForExistingUser(email, redirectTo)
+
+    if ('error' in magicLink) {
+      setError(magicLink.message)
+      setIsLoading(false)
+      return
+    }
+
+    // Navigate to the action link directly to establish a session without email
+    window.location.href = magicLink.actionLink
   }
 
   async function sendMagicLink(email: string) {
@@ -176,47 +184,7 @@ export default function AuthForm() {
       }
 
       if (data.user && data.session) {
-        // User is authenticated - set has_password flag if not already set
-        try {
-          await setHasPassword(data.user.id, true)
-        } catch (err) {
-          console.warn('Failed to set has_password flag:', err)
-        }
-
-        // Sync session to server-side cookies
-        try {
-          await setAuthSession(data.session.access_token, data.session.refresh_token)
-        } catch (err) {
-          console.warn('Failed to set auth cookies:', err)
-        }
-
-        // Clear settings modal state
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('settings-modal-is-open')
-          localStorage.removeItem('settings-modal-section')
-        }
-
-        // Get redirect URL - use query param if provided, otherwise use onboarding redirect path
-        const redirectParam = searchParams.get('redirect')
-        if (redirectParam) {
-          // Preserve invite token if present in redirect param
-          if (redirectParam.includes('/join') && redirectParam.includes('token=')) {
-            await preserveInviteTokenFromPath(redirectParam)
-          }
-          router.push(redirectParam)
-          router.refresh()
-        } else {
-          // Use onboarding redirect path for proper workspace resolution
-          try {
-            const redirectPath = await getOnboardingRedirectPath()
-            router.push(redirectPath)
-            router.refresh()
-          } catch (err) {
-            console.warn('Failed to get onboarding redirect path:', err)
-            router.push('/dashboard')
-            router.refresh()
-          }
-        }
+        await handleAuthenticated(data.user.id, data.session.access_token, data.session.refresh_token)
       } else if (data.user && !data.session) {
         setError('Please check your email and confirm your account before signing in.')
         setIsLoading(false)
@@ -224,6 +192,133 @@ export default function AuthForm() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign in')
       setIsLoading(false)
+    }
+  }
+
+  async function handleSignupSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+
+    if (!fullName.trim()) {
+      setError('Please enter your name')
+      setIsLoading(false)
+      return
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      setIsLoading(false)
+      return
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      const result = await createUserWithPassword(email, password, fullName.trim())
+
+      if ('error' in result) {
+        if (result.error === 'USER_EXISTS') {
+          const authState = await checkUserAuthState(email)
+          if ('success' in authState && authState.state.userExists) {
+            if (authState.state.hasPassword) {
+              setStep('password')
+              setIsLoading(false)
+              return
+            }
+            await handleExistingUserWithoutPassword()
+            return
+          }
+        }
+
+        setError(result.message)
+        setIsLoading(false)
+        return
+      }
+
+      const supabase = getSupabaseClient()
+      if (!supabase) {
+        setError('Supabase is not configured')
+        setIsLoading(false)
+        return
+      }
+
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (signInError) {
+        setError(signInError.message)
+        setIsLoading(false)
+        return
+      }
+
+      if (data.user && data.session) {
+        // Ensure server actions can read auth cookies before profile update
+        await setAuthSession(data.session.access_token, data.session.refresh_token)
+        const profileResult = await updateUserProfile({
+          full_name: fullName.trim(),
+        })
+        if ('error' in profileResult) {
+          setError(profileResult.message)
+          setIsLoading(false)
+          return
+        }
+        await handleAuthenticated(data.user.id, data.session.access_token, data.session.refresh_token)
+      } else {
+        setError('Failed to sign in after creating account')
+        setIsLoading(false)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create account')
+      setIsLoading(false)
+    }
+  }
+
+  async function handleAuthenticated(userId: string, accessToken: string, refreshToken: string) {
+    // Sync session to server-side cookies before server actions that need auth
+    try {
+      await setAuthSession(accessToken, refreshToken)
+    } catch (err) {
+      console.warn('Failed to set auth cookies:', err)
+    }
+
+    // User is authenticated - set has_password flag if not already set
+    try {
+      await setHasPassword(userId, true)
+    } catch (err) {
+      console.warn('Failed to set has_password flag:', err)
+    }
+
+    // Clear settings modal state
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('settings-modal-is-open')
+      localStorage.removeItem('settings-modal-section')
+    }
+
+    // Get redirect URL - use query param if provided, otherwise use onboarding redirect path
+    const redirectParam = searchParams.get('redirect')
+    if (redirectParam) {
+      // Preserve invite token if present in redirect param
+      if (redirectParam.includes('/join') && redirectParam.includes('token=')) {
+        await preserveInviteTokenFromPath(redirectParam)
+      }
+      router.push(redirectParam)
+      router.refresh()
+    } else {
+      // Use onboarding redirect path for proper workspace resolution
+      try {
+        const redirectPath = await getOnboardingRedirectPath()
+        router.push(redirectPath)
+        router.refresh()
+      } catch (err) {
+        console.warn('Failed to get onboarding redirect path:', err)
+        router.push('/dashboard')
+        router.refresh()
+      }
     }
   }
 
@@ -306,6 +401,12 @@ export default function AuthForm() {
         {error && (
           <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-md">
             {error}
+          </div>
+        )}
+
+        {intent === 'invite' && (
+          <div className="bg-muted/50 border border-muted rounded-md px-4 py-3 text-sm text-muted-foreground">
+            You&apos;re accepting a studio invite. New here? You&apos;ll create a password next.
           </div>
         )}
 
@@ -427,6 +528,101 @@ export default function AuthForm() {
             Forgot password?
           </button>
         </div>
+      </form>
+    )
+  }
+
+  // Signup screen
+  if (step === 'signup') {
+    return (
+      <form onSubmit={handleSignupSubmit} className="space-y-4">
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-md">
+            {error}
+          </div>
+        )}
+
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">
+            Email
+          </label>
+          <Input
+            type="email"
+            id="email"
+            name="email"
+            value={email}
+            placeholder="work@email.com"
+            disabled={true}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="full-name" className="block text-sm font-medium text-foreground mb-1">
+            Full name
+          </label>
+          <Input
+            type="text"
+            id="full-name"
+            name="full-name"
+            required
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Your name"
+            disabled={isLoading}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1">
+            Create password
+          </label>
+          <div className="relative">
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              id="password"
+              name="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="At least 8 characters"
+              disabled={isLoading}
+              autoFocus
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground focus-visible:outline-none"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="confirm-password" className="block text-sm font-medium text-foreground mb-1">
+            Confirm password
+          </label>
+          <Input
+            type={showPassword ? 'text' : 'password'}
+            id="confirm-password"
+            name="confirm-password"
+            required
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Re-enter password"
+            disabled={isLoading}
+          />
+        </div>
+
+        <Button
+          type="submit"
+          disabled={isLoading}
+          className="w-full"
+        >
+          {isLoading ? 'Creating account...' : 'Create account'}
+        </Button>
       </form>
     )
   }

@@ -60,7 +60,7 @@ export async function getUserStudios(): Promise<UserStudio[]> {
   // Query memberships with studio details
   // RLS will automatically filter to only studios where user is a member
   const { data, error } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select(`
       studio_id,
       role,

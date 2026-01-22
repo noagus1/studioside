@@ -3,7 +3,6 @@ import { getSupabaseClient } from '@/lib/supabase/serverClient'
 import { getUserStudios } from '@/data/getUserStudios'
 import { getCurrentStudio } from '@/data/getCurrentStudio'
 import { getUserProfile } from '@/data/getUserProfile'
-import { getCurrentStudioId } from '@/lib/cookies/currentStudio'
 import StudioSwitcher from '@/components/StudioSwitcher'
 import { PageColumns, PageContainer, MainColumn, SideColumn } from '@/components/layout/PageColumns'
 import { AutoSelectStudio } from './components/AutoSelectStudio'
@@ -52,16 +51,14 @@ export default async function DashboardPage() {
     redirect('/join')
   }
   
-  // Check if a studio is selected
-  const currentStudioId = await getCurrentStudioId()
-  
   // Get current studio - getCurrentStudio() will ensure RLS context is set
   // The getSupabaseClient() call inside getCurrentStudio() already sets RLS context
   // from the cookie, but we explicitly set it again in getCurrentStudio() for safety
   let currentStudio = await getCurrentStudio()
   
-  // If no studio is selected, use client component to auto-select (faster than redirect)
-  const needsAutoSelect = !currentStudioId && studios.length > 0
+  // If no valid studio is available, auto-select one client-side
+  // This covers missing cookies and stale/invalid studio IDs.
+  const needsAutoSelect = !currentStudio && studios.length > 0
 
   // Check if onboarding is complete (has rooms OR team members beyond owner)
   let showWelcomeModal = false

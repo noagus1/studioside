@@ -68,7 +68,7 @@ export async function createStudioInvite({
   }
 
   const { data: membership, error: membershipError } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role, status')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -99,7 +99,7 @@ export async function createStudioInvite({
 
   if (existingProfile?.id) {
     const { data: existingMembership } = await admin
-      .from('studio_memberships')
+      .from('studio_users')
       .select('id, status')
       .eq('studio_id', studioId)
       .eq('user_id', existingProfile.id)

@@ -89,7 +89,7 @@ export async function getTeamData(): Promise<TeamData | TeamDataError> {
 
   // Verify user is a member of this studio before fetching all members
   const { data: userMembership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id, role, status')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -109,7 +109,7 @@ export async function getTeamData(): Promise<TeamData | TeamDataError> {
     // Use admin client to bypass RLS so we can see all members in the studio
     // This is safe because we've already verified the user is a member above
     admin
-      .from('studio_memberships')
+      .from('studio_users')
       .select('id, role, status, joined_at, created_at, user_id')
       .eq('studio_id', studioId)
       .eq('status', 'active')

@@ -41,7 +41,7 @@ export async function getMembership(): Promise<Membership | null> {
   }
 
   const { data, error } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('*')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)

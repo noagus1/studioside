@@ -137,7 +137,7 @@ export async function acceptInvite(token: string): Promise<AcceptInviteResult> {
   // Check if user is already a member of this studio
   // Use admin client to bypass RLS for this check too
   const { data: existingMembership } = await admin
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id, studio_id, role, status')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -148,7 +148,7 @@ export async function acceptInvite(token: string): Promise<AcceptInviteResult> {
   // Create or reactivate membership
   if (!existingMembership || existingMembership.status !== 'active') {
     const { data: upsertedMembership, error: membershipError } = await admin
-      .from('studio_memberships')
+      .from('studio_users')
       .upsert(
         {
           studio_id: studioId,

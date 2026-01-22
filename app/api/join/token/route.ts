@@ -13,12 +13,14 @@ const COOKIE_NAME = 'pending_invite_token'
  * - token: Set the invite token cookie and redirect to /join?token={token}
  * - action=clear: Clear the invite token cookie
  * - returnToken: If provided with action=clear, redirect to /join?token={returnToken} to show error
+ * - returnTo: Optional redirect path after clear (defaults to /join)
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const token = searchParams.get('token')
   const action = searchParams.get('action')
   const returnToken = searchParams.get('returnToken')
+  const returnTo = searchParams.get('returnTo')
 
   const cookieStore = cookies()
 
@@ -30,9 +32,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(
         new URL(`/join?token=${encodeURIComponent(returnToken)}`, request.url)
       )
-    } else {
-      return NextResponse.redirect(new URL('/join', request.url))
     }
+    if (returnTo && returnTo.startsWith('/')) {
+      return NextResponse.redirect(new URL(returnTo, request.url))
+    }
+    return NextResponse.redirect(new URL('/join', request.url))
   } else if (token) {
     // Set the cookie
     cookieStore.set(COOKIE_NAME, token, {

@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase/serverClient'
 import AcceptInviteForm from './AcceptInviteForm'
 import Link from 'next/link'
@@ -20,13 +21,17 @@ export default async function AcceptInvitePanel({ token, invitation }: AcceptInv
   let isAlreadyMember = false
   if (user && invitation.studio?.id) {
     const { data: membership } = await supabase
-      .from('studio_memberships')
+      .from('studio_users')
       .select('id')
       .eq('studio_id', invitation.studio.id)
       .eq('user_id', user.id)
       .maybeSingle()
     
     isAlreadyMember = !!membership
+  }
+
+  if (isAlreadyMember) {
+    redirect('/api/join/token?action=clear&returnTo=/dashboard')
   }
 
   // Check for email mismatch (warn but allow)
@@ -105,28 +110,13 @@ export default async function AcceptInvitePanel({ token, invitation }: AcceptInv
         {!isAuthenticated ? (
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              Please sign in to accept this invitation.
+              Sign up or sign in to accept this invitation. New here? You&apos;ll create your password next.
             </p>
             <Link
-              href={`/login?redirect=/join?token=${token}`}
+              href={`/login?redirect=/join?token=${token}&intent=invite`}
               className="block w-full text-center bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
             >
-              Sign in to Accept Invite
-            </Link>
-          </div>
-        ) : isAlreadyMember ? (
-          <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded">
-              <p className="font-semibold mb-1">You&apos;re already a member!</p>
-              <p className="text-sm">
-                You already have access to {invitation.studio.name}. You can switch to this studio from your dashboard.
-              </p>
-            </div>
-            <Link
-              href="/dashboard"
-              className="block w-full text-center bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
-            >
-              Go to Dashboard
+              Sign up or Sign in to Accept Invite
             </Link>
           </div>
         ) : (

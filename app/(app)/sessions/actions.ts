@@ -223,7 +223,7 @@ export async function getClients(): Promise<GetClientsResult | GetClientsError> 
 
   // Verify user is a member of this studio
   const { data: userMembership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -354,7 +354,7 @@ export async function getSessionDefaults(): Promise<SessionDefaultsResult | Sess
 
   // Verify user is a member of this studio
   const { data: userMembership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -449,7 +449,7 @@ export async function getSessions(
 
   // Verify user is a member of this studio
   const { data: userMembership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -579,7 +579,7 @@ export async function getSessionById(
 
   // Verify membership
   const { data: userMembership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -750,7 +750,7 @@ async function fetchSessionGearContext(
   }
 
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -963,7 +963,7 @@ export async function createSession(
 
   // Verify user is a member of this studio and is an admin
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -1099,7 +1099,7 @@ export async function createSession(
   if (input.engineer_id) {
     // Check that engineer is a member of the current studio
     const { data: engineerMembership } = await supabase
-      .from('studio_memberships')
+      .from('studio_users')
       .select('user_id')
       .eq('studio_id', studioId)
       .eq('user_id', input.engineer_id)
@@ -1352,7 +1352,7 @@ export async function deleteSession(
 
   // Verify user is a member of this studio and is an admin
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -1475,7 +1475,7 @@ export async function updateSessionStatus(
 
   // Verify user is a member of this studio and is an admin
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -1618,7 +1618,7 @@ export async function updateSession(
 
   // Verify user is a member of this studio and is an admin
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -1736,7 +1736,7 @@ export async function updateSession(
   if (input.engineer_id) {
     // Check that engineer is a member of the current studio
     const { data: engineerMembership } = await supabase
-      .from('studio_memberships')
+      .from('studio_users')
       .select('user_id')
       .eq('studio_id', studioId)
       .eq('user_id', input.engineer_id)

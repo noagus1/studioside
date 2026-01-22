@@ -40,7 +40,7 @@ export type SessionStatus =
   | 'cancelled'
   | 'no_show'
 export type BillingStyle = 'hourly' | 'flat_session'
-export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'void'
+export type InvoiceDetailStatus = 'to_invoice' | 'invoiced'
 export type GearStatus = 'available' | 'in_use' | 'maintenance' | 'missing'
 
 // Database tables
@@ -96,44 +96,48 @@ export interface SessionGear {
   updated_at: Timestamp
 }
 
-export interface Invoice {
+export interface InvoiceStatus {
+  id: string
+  name: InvoiceDetailStatus
+}
+
+export interface InvoiceMaster {
   id: string
   studio_id: string
   client_id: string | null
   invoice_number: string
-  status: InvoiceStatus
-  currency: string
+  period_start: string
+  period_end: string
+  issued_at: Timestamp | null
+  pdf_url: string | null
   issue_date: string
   due_date: string | null
-  subtotal: number
-  tax_total: number
-  discount_total: number
-  total: number
+  currency: string
+  customer_name: string | null
+  customer_email: string | null
   memo: string | null
   notes: string | null
   payment_link_url: string | null
-  pdf_url: string | null
   stripe_payment_intent_id: string | null
   stripe_checkout_session_id: string | null
-  metadata: Json
-  customer_name: string | null
-  customer_email: string | null
-  sent_at: Timestamp | null
   paid_at: Timestamp | null
   created_by: string | null
   created_at: Timestamp
   updated_at: Timestamp
 }
 
-export interface InvoiceItem {
+export interface InvoiceDetail {
   id: string
-  invoice_id: string
-  name: string
-  description: string | null
+  studio_id: string
+  client_id: string
+  session_id: string | null
+  description: string
   quantity: number
-  unit_amount: number
-  tax_rate: number
-  discount_amount: number
+  unit_price_cents: number
+  total_cents: number
+  status_id: string
+  invoice_id: string | null
+  service_date: string
   sort_order: number
   created_at: Timestamp
   updated_at: Timestamp

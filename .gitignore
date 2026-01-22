@@ -25,3 +25,4 @@ supabase/migrations/.meta/
 
 # production
 *.log
+.vercel

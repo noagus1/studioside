@@ -125,7 +125,7 @@ export async function getRooms(): Promise<GetRoomsResult | GetRoomsError> {
 
   // Verify user is a member of this studio
   const { data: userMembership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -222,7 +222,7 @@ export async function createRoom(
 
   // Verify user is a member of this studio and is an admin
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -349,7 +349,7 @@ export async function updateRoom(
 
   // Verify user is a member of this studio and is an admin
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -544,7 +544,7 @@ export async function deleteRoom(
 
   // Verify user is a member of this studio and is an admin
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)

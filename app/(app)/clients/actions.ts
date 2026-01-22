@@ -153,7 +153,7 @@ export async function createClient(
 
   // Verify user is a member of this studio and is an admin
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -248,7 +248,7 @@ export async function getClients(): Promise<GetClientsResult | GetClientsError> 
 
   // Verify user is a member of this studio
   const { data: userMembership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -338,7 +338,7 @@ export async function getClientById(
 
   // Verify user is a member of this studio
   const { data: userMembership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -440,7 +440,7 @@ export async function getSessionsForClient(
 
   // Verify user is a member of this studio
   const { data: userMembership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('id')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -582,7 +582,7 @@ export async function updateClient(
 
   // Verify user is a member of this studio and is an admin
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
@@ -728,7 +728,7 @@ export async function deleteClient(
 
   // Verify user is a member of this studio and is an admin
   const { data: membership } = await supabase
-    .from('studio_memberships')
+    .from('studio_users')
     .select('role')
     .eq('studio_id', studioId)
     .eq('user_id', user.id)
