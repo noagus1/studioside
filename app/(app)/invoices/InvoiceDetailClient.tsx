@@ -64,10 +64,7 @@ export function InvoiceDetailClient({ invoice: initialInvoice, clients }: Props)
       const copy = [...prev]
       copy[index] = {
         ...copy[index],
-        [field]:
-          field === 'name' || field === 'description'
-            ? value
-            : Number(value) || 0,
+        [field]: field === 'name' ? value : Number(value) || 0,
       }
       return copy
     })

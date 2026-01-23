@@ -2,7 +2,6 @@
 
 import * as React from 'react'
 import { toast } from 'sonner'
-import { ChevronDown } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -311,12 +310,8 @@ export default function GeneralSection({
   const [contactEmail, setContactEmail] = React.useState('')
   const [contactPhone, setContactPhone] = React.useState('')
   const [timezone, setTimezone] = React.useState('UTC')
-  const [street, setStreet] = React.useState('')
   const [city, setCity] = React.useState('')
-  const [state, setStateValue] = React.useState('')
-  const [postalCode, setPostalCode] = React.useState('')
   const [country, setCountry] = React.useState('')
-  const [fullAddressOpen, setFullAddressOpen] = React.useState(false)
   // Saving states
   const [savingContact, setSavingContact] = React.useState(false)
   const [savingLocation, setSavingLocation] = React.useState(false)
@@ -327,10 +322,7 @@ export default function GeneralSection({
     contact_email: '',
     contact_phone: '',
     timezone: 'UTC',
-    street: '',
     city: '',
-    state: '',
-    postal_code: '',
     country: '',
   })
 
@@ -351,21 +343,14 @@ export default function GeneralSection({
         setContactEmail(initialData.studio.contact_email || '')
         setContactPhone(formatPhoneInput(initialData.studio.contact_phone || ''))
         setTimezone(initialData.studio.timezone || 'UTC')
-        setStreet(initialData.studio.street || '')
         setCity(initialData.studio.city || '')
-        setStateValue(initialData.studio.state || '')
-        setPostalCode(initialData.studio.postal_code || '')
         setCountry(initialData.studio.country || '')
-        setFullAddressOpen(Boolean(initialData.studio.street || initialData.studio.postal_code))
         setTimezoneManuallySet(false)
         originalValues.current = {
           contact_email: initialData.studio.contact_email || '',
           contact_phone: formatPhoneInput(initialData.studio.contact_phone || ''),
           timezone: initialData.studio.timezone || 'UTC',
-          street: initialData.studio.street || '',
           city: initialData.studio.city || '',
-          state: initialData.studio.state || '',
-          postal_code: initialData.studio.postal_code || '',
           country: initialData.studio.country || '',
         }
         setLoading(false)
@@ -382,21 +367,14 @@ export default function GeneralSection({
       setContactEmail(result.studio.contact_email || '')
       setContactPhone(formatPhoneInput(result.studio.contact_phone || ''))
       setTimezone(result.studio.timezone || 'UTC')
-      setStreet(result.studio.street || '')
       setCity(result.studio.city || '')
-      setStateValue(result.studio.state || '')
-      setPostalCode(result.studio.postal_code || '')
       setCountry(result.studio.country || '')
-      setFullAddressOpen(Boolean(result.studio.street || result.studio.postal_code))
       setTimezoneManuallySet(false)
       originalValues.current = {
         contact_email: result.studio.contact_email || '',
         contact_phone: formatPhoneInput(result.studio.contact_phone || ''),
         timezone: result.studio.timezone || 'UTC',
-        street: result.studio.street || '',
         city: result.studio.city || '',
-        state: result.studio.state || '',
-        postal_code: result.studio.postal_code || '',
         country: result.studio.country || '',
       }
       setLoading(false)
@@ -459,16 +437,16 @@ export default function GeneralSection({
 
   React.useEffect(() => {
     setTimezoneManuallySet(false)
-  }, [city, state, country])
+  }, [city, country])
 
   React.useEffect(() => {
-    if (!city && !state && !country) return
+    if (!city && !country) return
     if (timezoneManuallySet) return
-    const inferred = inferTimezoneFromLocation(city, state, country)
+    const inferred = inferTimezoneFromLocation(city, '', country)
     if (inferred && inferred !== timezone) {
       setTimezone(inferred)
     }
-  }, [city, state, country, timezone, timezoneManuallySet])
+  }, [city, country, timezone, timezoneManuallySet])
 
   const hasContactChanges =
     showInformation &&
@@ -477,10 +455,7 @@ export default function GeneralSection({
 
   const hasLocationChanges =
     showInformation &&
-    (street.trim() !== originalValues.current.street ||
-      city.trim() !== originalValues.current.city ||
-      state.trim() !== originalValues.current.state ||
-      postalCode.trim() !== originalValues.current.postal_code ||
+    (city.trim() !== originalValues.current.city ||
       country.trim() !== originalValues.current.country ||
       (showTimezone && timezone !== originalValues.current.timezone))
 
@@ -567,25 +542,16 @@ export default function GeneralSection({
   const handleSaveLocation = async () => {
     if (!hasLocationChanges) return
 
-    const trimmedStreet = street.trim()
     const trimmedCity = city.trim()
-    const trimmedState = state.trim()
-    const trimmedPostal = postalCode.trim()
     const trimmedCountry = country.trim()
 
     const exceeds = (value: string, max: number) => value.length > max
-    if (
-      exceeds(trimmedStreet, 160) ||
-      exceeds(trimmedCity, 96) ||
-      exceeds(trimmedState, 96) ||
-      exceeds(trimmedPostal, 32) ||
-      exceeds(trimmedCountry, 96)
-    ) {
+    if (exceeds(trimmedCity, 96) || exceeds(trimmedCountry, 96)) {
       toast.error('Location fields exceed allowed length')
       return
     }
 
-    const anyLocation = trimmedCity || trimmedState || trimmedCountry || trimmedStreet || trimmedPostal
+    const anyLocation = trimmedCity || trimmedCountry
     if (anyLocation && (!trimmedCity || !trimmedCountry)) {
       toast.error('City and country are required for location')
       return
@@ -594,10 +560,7 @@ export default function GeneralSection({
     setSavingLocation(true)
     try {
       const result = await updateStudio({
-        street: trimmedStreet || null,
         city: trimmedCity || null,
-        state: trimmedState || null,
-        postal_code: trimmedPostal || null,
         country: trimmedCountry || null,
         timezone,
       })
@@ -608,10 +571,7 @@ export default function GeneralSection({
         return
       }
 
-      originalValues.current.street = trimmedStreet
       originalValues.current.city = trimmedCity
-      originalValues.current.state = trimmedState
-      originalValues.current.postal_code = trimmedPostal
       originalValues.current.country = trimmedCountry
       originalValues.current.timezone = timezone
 
@@ -620,10 +580,7 @@ export default function GeneralSection({
           ...data,
           studio: {
             ...data.studio,
-            street: trimmedStreet || null,
             city: trimmedCity || null,
-            state: trimmedState || null,
-            postal_code: trimmedPostal || null,
             country: trimmedCountry || null,
             timezone,
           },
@@ -640,12 +597,8 @@ export default function GeneralSection({
 
   // Handle cancel location section
   const handleCancelLocation = () => {
-    setStreet(originalValues.current.street)
     setCity(originalValues.current.city)
-    setStateValue(originalValues.current.state)
-    setPostalCode(originalValues.current.postal_code)
     setCountry(originalValues.current.country)
-    setFullAddressOpen(Boolean(originalValues.current.street || originalValues.current.postal_code))
     setTimezone(originalValues.current.timezone)
     setTimezoneManuallySet(false)
   }
@@ -783,26 +736,6 @@ export default function GeneralSection({
 
             <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
               <div>
-                <label htmlFor="studio-state" className="text-sm font-medium">
-                  State / Region
-                  <span className="block text-xs text-muted-foreground">State or region.</span>
-                </label>
-              </div>
-              <div className="max-w-md">
-                <Input
-                  id="studio-state"
-                  value={state}
-                  onChange={(e) => setStateValue(e.target.value)}
-                  placeholder="CA"
-                  maxLength={96}
-                  disabled={savingLocation || !isOwnerOrAdmin}
-                  className={!isOwnerOrAdmin ? 'bg-muted' : ''}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
-              <div>
                 <label htmlFor="studio-country" className="text-sm font-medium">
                   Country
                   <span className="block text-xs text-muted-foreground">Used for timezone defaults.</span>
@@ -820,81 +753,6 @@ export default function GeneralSection({
                 />
               </div>
             </div>
-
-            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
-              <div>
-                <p className="text-sm font-medium">
-                  Add full address
-                  <span className="block text-xs text-muted-foreground">Optional for invoices.</span>
-                </p>
-              </div>
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center gap-2"
-                  onClick={() => setFullAddressOpen((prev) => !prev)}
-                  disabled={savingLocation}
-                >
-                  <span>{fullAddressOpen ? 'Hide full address' : 'Add full address'}</span>
-                  <ChevronDown
-                    className={cn(
-                      'h-4 w-4 transition-transform',
-                      fullAddressOpen ? 'rotate-180' : 'rotate-0'
-                    )}
-                  />
-                </Button>
-              </div>
-            </div>
-
-            {fullAddressOpen && (
-              <>
-                <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
-                  <div>
-                    <label htmlFor="studio-street" className="text-sm font-medium">
-                      Street
-                      <span className="block text-xs text-muted-foreground">
-                        Optional street address.
-                      </span>
-                    </label>
-                  </div>
-                  <div className="max-w-md">
-                    <Input
-                      id="studio-street"
-                      value={street}
-                      onChange={(e) => setStreet(e.target.value)}
-                      placeholder="123 Main St"
-                      maxLength={160}
-                      disabled={savingLocation || !isOwnerOrAdmin}
-                      className={!isOwnerOrAdmin ? 'bg-muted' : ''}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b last:border-b-0">
-                  <div>
-                    <label htmlFor="studio-postal" className="text-sm font-medium">
-                      Postal code
-                      <span className="block text-xs text-muted-foreground">
-                        Optional postal code.
-                      </span>
-                    </label>
-                  </div>
-                  <div className="max-w-md">
-                    <Input
-                      id="studio-postal"
-                      value={postalCode}
-                      onChange={(e) => setPostalCode(e.target.value)}
-                      placeholder="94103"
-                      maxLength={32}
-                      disabled={savingLocation || !isOwnerOrAdmin}
-                      className={!isOwnerOrAdmin ? 'bg-muted' : ''}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
 
             <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
               <div>
