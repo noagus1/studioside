@@ -3,7 +3,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Calendar, AudioLines, FileText, LayoutGrid, Building2, Clock } from 'lucide-react'
+import { Calendar, AudioLines, LayoutGrid, Building2, Clock } from 'lucide-react'
 import { MusicMicrophoneIcon } from '@/components/icons/MusicMicrophone'
 import {
   Sidebar,
@@ -77,7 +77,6 @@ export default function AppSidebarClient({ user, role }: Props) {
       items: [
         { title: 'Artists', url: '/clients', icon: MusicMicrophoneIcon },
         { title: 'Gear', url: '/gear', icon: AudioLines },
-        { title: 'Invoices', url: '/invoices', icon: FileText },
         { title: 'Studio', url: '/studio?section=general', icon: Building2 },
       ],
     },

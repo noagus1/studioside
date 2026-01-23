@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { toast } from 'sonner'
+import { Check, ChevronsUpDown } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,6 +12,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getStudioSettings, type StudioSettingsData } from '@/actions/getStudioSettings'
 import { updateStudio } from '@/actions/updateStudio'
@@ -37,6 +47,286 @@ const TIMEZONES = [
   { value: 'Australia/Sydney', label: 'Sydney' },
   { value: 'Australia/Melbourne', label: 'Melbourne' },
 ]
+
+type CountryOption = { code: string; name: string }
+
+const ALL_COUNTRIES: CountryOption[] = [
+  { code: 'AF', name: 'Afghanistan' },
+  { code: 'AX', name: 'Aland Islands' },
+  { code: 'AL', name: 'Albania' },
+  { code: 'DZ', name: 'Algeria' },
+  { code: 'AS', name: 'American Samoa' },
+  { code: 'AD', name: 'Andorra' },
+  { code: 'AO', name: 'Angola' },
+  { code: 'AI', name: 'Anguilla' },
+  { code: 'AQ', name: 'Antarctica' },
+  { code: 'AG', name: 'Antigua and Barbuda' },
+  { code: 'AR', name: 'Argentina' },
+  { code: 'AM', name: 'Armenia' },
+  { code: 'AW', name: 'Aruba' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'AT', name: 'Austria' },
+  { code: 'AZ', name: 'Azerbaijan' },
+  { code: 'BS', name: 'Bahamas' },
+  { code: 'BH', name: 'Bahrain' },
+  { code: 'BD', name: 'Bangladesh' },
+  { code: 'BB', name: 'Barbados' },
+  { code: 'BY', name: 'Belarus' },
+  { code: 'BE', name: 'Belgium' },
+  { code: 'BZ', name: 'Belize' },
+  { code: 'BJ', name: 'Benin' },
+  { code: 'BM', name: 'Bermuda' },
+  { code: 'BT', name: 'Bhutan' },
+  { code: 'BO', name: 'Bolivia' },
+  { code: 'BQ', name: 'Bonaire, Sint Eustatius and Saba' },
+  { code: 'BA', name: 'Bosnia and Herzegovina' },
+  { code: 'BW', name: 'Botswana' },
+  { code: 'BV', name: 'Bouvet Island' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'IO', name: 'British Indian Ocean Territory' },
+  { code: 'BN', name: 'Brunei Darussalam' },
+  { code: 'BG', name: 'Bulgaria' },
+  { code: 'BF', name: 'Burkina Faso' },
+  { code: 'BI', name: 'Burundi' },
+  { code: 'KH', name: 'Cambodia' },
+  { code: 'CM', name: 'Cameroon' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'CV', name: 'Cabo Verde' },
+  { code: 'KY', name: 'Cayman Islands' },
+  { code: 'CF', name: 'Central African Republic' },
+  { code: 'TD', name: 'Chad' },
+  { code: 'CL', name: 'Chile' },
+  { code: 'CN', name: 'China' },
+  { code: 'CX', name: 'Christmas Island' },
+  { code: 'CC', name: 'Cocos (Keeling) Islands' },
+  { code: 'CO', name: 'Colombia' },
+  { code: 'KM', name: 'Comoros' },
+  { code: 'CG', name: 'Congo' },
+  { code: 'CD', name: 'Congo, Democratic Republic of the' },
+  { code: 'CK', name: 'Cook Islands' },
+  { code: 'CR', name: 'Costa Rica' },
+  { code: 'CI', name: "Cote d'Ivoire" },
+  { code: 'HR', name: 'Croatia' },
+  { code: 'CU', name: 'Cuba' },
+  { code: 'CW', name: 'Curacao' },
+  { code: 'CY', name: 'Cyprus' },
+  { code: 'CZ', name: 'Czechia' },
+  { code: 'DK', name: 'Denmark' },
+  { code: 'DJ', name: 'Djibouti' },
+  { code: 'DM', name: 'Dominica' },
+  { code: 'DO', name: 'Dominican Republic' },
+  { code: 'EC', name: 'Ecuador' },
+  { code: 'EG', name: 'Egypt' },
+  { code: 'SV', name: 'El Salvador' },
+  { code: 'GQ', name: 'Equatorial Guinea' },
+  { code: 'ER', name: 'Eritrea' },
+  { code: 'EE', name: 'Estonia' },
+  { code: 'SZ', name: 'Eswatini' },
+  { code: 'ET', name: 'Ethiopia' },
+  { code: 'FK', name: 'Falkland Islands (Malvinas)' },
+  { code: 'FO', name: 'Faroe Islands' },
+  { code: 'FJ', name: 'Fiji' },
+  { code: 'FI', name: 'Finland' },
+  { code: 'FR', name: 'France' },
+  { code: 'GF', name: 'French Guiana' },
+  { code: 'PF', name: 'French Polynesia' },
+  { code: 'TF', name: 'French Southern Territories' },
+  { code: 'GA', name: 'Gabon' },
+  { code: 'GM', name: 'Gambia' },
+  { code: 'GE', name: 'Georgia' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'GH', name: 'Ghana' },
+  { code: 'GI', name: 'Gibraltar' },
+  { code: 'GR', name: 'Greece' },
+  { code: 'GL', name: 'Greenland' },
+  { code: 'GD', name: 'Grenada' },
+  { code: 'GP', name: 'Guadeloupe' },
+  { code: 'GU', name: 'Guam' },
+  { code: 'GT', name: 'Guatemala' },
+  { code: 'GG', name: 'Guernsey' },
+  { code: 'GN', name: 'Guinea' },
+  { code: 'GW', name: 'Guinea-Bissau' },
+  { code: 'GY', name: 'Guyana' },
+  { code: 'HT', name: 'Haiti' },
+  { code: 'HM', name: 'Heard Island and McDonald Islands' },
+  { code: 'VA', name: 'Holy See' },
+  { code: 'HN', name: 'Honduras' },
+  { code: 'HK', name: 'Hong Kong' },
+  { code: 'HU', name: 'Hungary' },
+  { code: 'IS', name: 'Iceland' },
+  { code: 'IN', name: 'India' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'IR', name: 'Iran' },
+  { code: 'IQ', name: 'Iraq' },
+  { code: 'IE', name: 'Ireland' },
+  { code: 'IM', name: 'Isle of Man' },
+  { code: 'IL', name: 'Israel' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'JM', name: 'Jamaica' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'JE', name: 'Jersey' },
+  { code: 'JO', name: 'Jordan' },
+  { code: 'KZ', name: 'Kazakhstan' },
+  { code: 'KE', name: 'Kenya' },
+  { code: 'KI', name: 'Kiribati' },
+  { code: 'KP', name: 'North Korea' },
+  { code: 'KR', name: 'South Korea' },
+  { code: 'KW', name: 'Kuwait' },
+  { code: 'KG', name: 'Kyrgyzstan' },
+  { code: 'LA', name: "Lao People's Democratic Republic" },
+  { code: 'LV', name: 'Latvia' },
+  { code: 'LB', name: 'Lebanon' },
+  { code: 'LS', name: 'Lesotho' },
+  { code: 'LR', name: 'Liberia' },
+  { code: 'LY', name: 'Libya' },
+  { code: 'LI', name: 'Liechtenstein' },
+  { code: 'LT', name: 'Lithuania' },
+  { code: 'LU', name: 'Luxembourg' },
+  { code: 'MO', name: 'Macao' },
+  { code: 'MG', name: 'Madagascar' },
+  { code: 'MW', name: 'Malawi' },
+  { code: 'MY', name: 'Malaysia' },
+  { code: 'MV', name: 'Maldives' },
+  { code: 'ML', name: 'Mali' },
+  { code: 'MT', name: 'Malta' },
+  { code: 'MH', name: 'Marshall Islands' },
+  { code: 'MQ', name: 'Martinique' },
+  { code: 'MR', name: 'Mauritania' },
+  { code: 'MU', name: 'Mauritius' },
+  { code: 'YT', name: 'Mayotte' },
+  { code: 'MX', name: 'Mexico' },
+  { code: 'FM', name: 'Micronesia, Federated States of' },
+  { code: 'MD', name: 'Moldova' },
+  { code: 'MC', name: 'Monaco' },
+  { code: 'MN', name: 'Mongolia' },
+  { code: 'ME', name: 'Montenegro' },
+  { code: 'MS', name: 'Montserrat' },
+  { code: 'MA', name: 'Morocco' },
+  { code: 'MZ', name: 'Mozambique' },
+  { code: 'MM', name: 'Myanmar' },
+  { code: 'NA', name: 'Namibia' },
+  { code: 'NR', name: 'Nauru' },
+  { code: 'NP', name: 'Nepal' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'NC', name: 'New Caledonia' },
+  { code: 'NZ', name: 'New Zealand' },
+  { code: 'NI', name: 'Nicaragua' },
+  { code: 'NE', name: 'Niger' },
+  { code: 'NG', name: 'Nigeria' },
+  { code: 'NU', name: 'Niue' },
+  { code: 'NF', name: 'Norfolk Island' },
+  { code: 'MK', name: 'North Macedonia' },
+  { code: 'MP', name: 'Northern Mariana Islands' },
+  { code: 'NO', name: 'Norway' },
+  { code: 'OM', name: 'Oman' },
+  { code: 'PK', name: 'Pakistan' },
+  { code: 'PW', name: 'Palau' },
+  { code: 'PS', name: 'Palestine, State of' },
+  { code: 'PA', name: 'Panama' },
+  { code: 'PG', name: 'Papua New Guinea' },
+  { code: 'PY', name: 'Paraguay' },
+  { code: 'PE', name: 'Peru' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'PN', name: 'Pitcairn' },
+  { code: 'PL', name: 'Poland' },
+  { code: 'PT', name: 'Portugal' },
+  { code: 'PR', name: 'Puerto Rico' },
+  { code: 'QA', name: 'Qatar' },
+  { code: 'RE', name: 'Reunion' },
+  { code: 'RO', name: 'Romania' },
+  { code: 'RU', name: 'Russia' },
+  { code: 'RW', name: 'Rwanda' },
+  { code: 'BL', name: 'Saint Barthelemy' },
+  { code: 'SH', name: 'Saint Helena, Ascension and Tristan da Cunha' },
+  { code: 'KN', name: 'Saint Kitts and Nevis' },
+  { code: 'LC', name: 'Saint Lucia' },
+  { code: 'MF', name: 'Saint Martin (French part)' },
+  { code: 'PM', name: 'Saint Pierre and Miquelon' },
+  { code: 'VC', name: 'Saint Vincent and the Grenadines' },
+  { code: 'WS', name: 'Samoa' },
+  { code: 'SM', name: 'San Marino' },
+  { code: 'ST', name: 'Sao Tome and Principe' },
+  { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'SN', name: 'Senegal' },
+  { code: 'RS', name: 'Serbia' },
+  { code: 'SC', name: 'Seychelles' },
+  { code: 'SL', name: 'Sierra Leone' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'SX', name: 'Sint Maarten (Dutch part)' },
+  { code: 'SK', name: 'Slovakia' },
+  { code: 'SI', name: 'Slovenia' },
+  { code: 'SB', name: 'Solomon Islands' },
+  { code: 'SO', name: 'Somalia' },
+  { code: 'ZA', name: 'South Africa' },
+  { code: 'GS', name: 'South Georgia and the South Sandwich Islands' },
+  { code: 'SS', name: 'South Sudan' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'LK', name: 'Sri Lanka' },
+  { code: 'SD', name: 'Sudan' },
+  { code: 'SR', name: 'Suriname' },
+  { code: 'SJ', name: 'Svalbard and Jan Mayen' },
+  { code: 'SE', name: 'Sweden' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'SY', name: 'Syrian Arab Republic' },
+  { code: 'TW', name: 'Taiwan' },
+  { code: 'TJ', name: 'Tajikistan' },
+  { code: 'TZ', name: 'Tanzania' },
+  { code: 'TH', name: 'Thailand' },
+  { code: 'TL', name: 'Timor-Leste' },
+  { code: 'TG', name: 'Togo' },
+  { code: 'TK', name: 'Tokelau' },
+  { code: 'TO', name: 'Tonga' },
+  { code: 'TT', name: 'Trinidad and Tobago' },
+  { code: 'TN', name: 'Tunisia' },
+  { code: 'TR', name: 'Turkey' },
+  { code: 'TM', name: 'Turkmenistan' },
+  { code: 'TC', name: 'Turks and Caicos Islands' },
+  { code: 'TV', name: 'Tuvalu' },
+  { code: 'UG', name: 'Uganda' },
+  { code: 'UA', name: 'Ukraine' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'US', name: 'United States' },
+  { code: 'UM', name: 'United States Minor Outlying Islands' },
+  { code: 'UY', name: 'Uruguay' },
+  { code: 'UZ', name: 'Uzbekistan' },
+  { code: 'VU', name: 'Vanuatu' },
+  { code: 'VE', name: 'Venezuela' },
+  { code: 'VN', name: 'Viet Nam' },
+  { code: 'VG', name: 'Virgin Islands, British' },
+  { code: 'VI', name: 'Virgin Islands, U.S.' },
+  { code: 'WF', name: 'Wallis and Futuna' },
+  { code: 'EH', name: 'Western Sahara' },
+  { code: 'YE', name: 'Yemen' },
+  { code: 'ZM', name: 'Zambia' },
+  { code: 'ZW', name: 'Zimbabwe' },
+]
+
+const DEFAULT_COUNTRY_CODES = [
+  'US',
+  'CA',
+  'GB',
+  'JP',
+  'DE',
+  'FR',
+  'NL',
+  'SE',
+  'AU',
+  'NZ',
+  'KR',
+  'BR',
+  'MX',
+  'ES',
+  'IT',
+]
+
+const COUNTRY_BY_CODE = new Map(ALL_COUNTRIES.map((country) => [country.code, country]))
+const COUNTRY_NAME_TO_CODE = new Map(
+  ALL_COUNTRIES.map((country) => [country.name.toUpperCase(), country.code])
+)
+const DEFAULT_COUNTRIES = DEFAULT_COUNTRY_CODES.map((code) => COUNTRY_BY_CODE.get(code)).filter(
+  (country): country is CountryOption => Boolean(country)
+)
 
 const COUNTRY_DEFAULT_TIMEZONE: Record<string, string> = {
   US: 'America/Chicago',
@@ -204,6 +494,15 @@ const COUNTRY_ALIASES: Record<string, string> = {
   ENGLAND: 'GB',
   SCOTLAND: 'GB',
   'GREAT BRITAIN': 'GB',
+  UK: 'GB',
+  'SOUTH KOREA': 'KR',
+  'KOREA, SOUTH': 'KR',
+  'KOREA REPUBLIC OF': 'KR',
+  'NORTH KOREA': 'KP',
+  'KOREA, NORTH': 'KP',
+  RUSSIA: 'RU',
+  VIETNAM: 'VN',
+  'CZECH REPUBLIC': 'CZ',
   UAE: 'AE',
 }
 
@@ -255,7 +554,13 @@ const isValidTimezone = (tz: string | undefined | null) => {
 const normalizeCountry = (value: string) => {
   if (!value) return ''
   const upper = value.trim().toUpperCase()
-  return COUNTRY_ALIASES[upper] ?? upper
+  if (COUNTRY_BY_CODE.has(upper)) return upper
+  return COUNTRY_ALIASES[upper] ?? COUNTRY_NAME_TO_CODE.get(upper) ?? upper
+}
+
+const getCountryLabel = (code: string) => {
+  if (!code) return ''
+  return COUNTRY_BY_CODE.get(code)?.name ?? code
 }
 
 const normalizeRegion = (value: string) => {
@@ -312,6 +617,8 @@ export default function GeneralSection({
   const [timezone, setTimezone] = React.useState('UTC')
   const [city, setCity] = React.useState('')
   const [country, setCountry] = React.useState('')
+  const [countryPopoverOpen, setCountryPopoverOpen] = React.useState(false)
+  const [countryQuery, setCountryQuery] = React.useState('')
   // Saving states
   const [savingContact, setSavingContact] = React.useState(false)
   const [savingLocation, setSavingLocation] = React.useState(false)
@@ -332,6 +639,16 @@ export default function GeneralSection({
   const showInformation = view === 'all' || view === 'general'
   const showTimezone = showInformation
 
+  const matchingCountries = React.useMemo(() => {
+    const query = countryQuery.trim().toLowerCase()
+    if (!query) return []
+    return ALL_COUNTRIES.filter((countryOption) => {
+      const name = countryOption.name.toLowerCase()
+      const code = countryOption.code.toLowerCase()
+      return name.includes(query) || code.includes(query)
+    })
+  }, [countryQuery])
+
   // Load initial data
   React.useEffect(() => {
     async function fetchData() {
@@ -339,19 +656,20 @@ export default function GeneralSection({
 
       // Use provided initial data if available (avoids double fetch on page load)
       if (initialData) {
+        const normalizedCountry = normalizeCountry(initialData.studio.country || '')
         setData(initialData)
         setContactEmail(initialData.studio.contact_email || '')
         setContactPhone(formatPhoneInput(initialData.studio.contact_phone || ''))
         setTimezone(initialData.studio.timezone || 'UTC')
         setCity(initialData.studio.city || '')
-        setCountry(initialData.studio.country || '')
+        setCountry(normalizedCountry)
         setTimezoneManuallySet(false)
         originalValues.current = {
           contact_email: initialData.studio.contact_email || '',
           contact_phone: formatPhoneInput(initialData.studio.contact_phone || ''),
           timezone: initialData.studio.timezone || 'UTC',
           city: initialData.studio.city || '',
-          country: initialData.studio.country || '',
+          country: normalizedCountry,
         }
         setLoading(false)
         return
@@ -364,18 +682,19 @@ export default function GeneralSection({
         return
       }
       setData(result)
+      const normalizedCountry = normalizeCountry(result.studio.country || '')
       setContactEmail(result.studio.contact_email || '')
       setContactPhone(formatPhoneInput(result.studio.contact_phone || ''))
       setTimezone(result.studio.timezone || 'UTC')
       setCity(result.studio.city || '')
-      setCountry(result.studio.country || '')
+      setCountry(normalizedCountry)
       setTimezoneManuallySet(false)
       originalValues.current = {
         contact_email: result.studio.contact_email || '',
         contact_phone: formatPhoneInput(result.studio.contact_phone || ''),
         timezone: result.studio.timezone || 'UTC',
         city: result.studio.city || '',
-        country: result.studio.country || '',
+        country: normalizedCountry,
       }
       setLoading(false)
     }
@@ -543,11 +862,16 @@ export default function GeneralSection({
     if (!hasLocationChanges) return
 
     const trimmedCity = city.trim()
-    const trimmedCountry = country.trim()
+    const trimmedCountry = normalizeCountry(country.trim())
 
     const exceeds = (value: string, max: number) => value.length > max
-    if (exceeds(trimmedCity, 96) || exceeds(trimmedCountry, 96)) {
+    if (exceeds(trimmedCity, 96)) {
       toast.error('Location fields exceed allowed length')
+      return
+    }
+
+    if (trimmedCountry && !COUNTRY_BY_CODE.has(trimmedCountry)) {
+      toast.error('Please select a valid country')
       return
     }
 
@@ -714,6 +1038,108 @@ export default function GeneralSection({
           <CardContent className="p-0">
             <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
               <div>
+                <label htmlFor="studio-country" className="text-sm font-medium">
+                  Country
+                  <span className="block text-xs text-muted-foreground">Used for timezone defaults.</span>
+                </label>
+              </div>
+              <div className="max-w-md">
+                <Popover
+                  open={countryPopoverOpen}
+                  onOpenChange={(open) => {
+                    if (savingLocation || !isOwnerOrAdmin) return
+                    setCountryPopoverOpen(open)
+                    if (!open) {
+                      setCountryQuery('')
+                    }
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="studio-country"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={countryPopoverOpen}
+                      className={cn(
+                        'w-full justify-between font-normal',
+                        !country ? 'text-muted-foreground' : '',
+                        !isOwnerOrAdmin ? 'bg-muted' : ''
+                      )}
+                      disabled={savingLocation || !isOwnerOrAdmin}
+                    >
+                      <span>{country ? getCountryLabel(country) : 'Select country'}</span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search country..."
+                        value={countryQuery}
+                        onValueChange={setCountryQuery}
+                      />
+                      <CommandList>
+                        {countryQuery ? (
+                          <CommandGroup heading="Results">
+                            {matchingCountries.map((countryOption) => (
+                              <CommandItem
+                                key={countryOption.code}
+                                value={`${countryOption.name} ${countryOption.code}`}
+                                onSelect={() => {
+                                  setCountry(countryOption.code)
+                                  setCountryPopoverOpen(false)
+                                  setCountryQuery('')
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    'h-4 w-4',
+                                    country === countryOption.code ? 'opacity-100' : 'opacity-0'
+                                  )}
+                                />
+                                <span>{countryOption.name}</span>
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                  {countryOption.code}
+                                </span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        ) : (
+                          <CommandGroup heading="Common">
+                            {DEFAULT_COUNTRIES.map((countryOption) => (
+                              <CommandItem
+                                key={countryOption.code}
+                                value={`${countryOption.name} ${countryOption.code}`}
+                                onSelect={() => {
+                                  setCountry(countryOption.code)
+                                  setCountryPopoverOpen(false)
+                                  setCountryQuery('')
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    'h-4 w-4',
+                                    country === countryOption.code ? 'opacity-100' : 'opacity-0'
+                                  )}
+                                />
+                                <span>{countryOption.name}</span>
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                  {countryOption.code}
+                                </span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                        <CommandEmpty>No country found.</CommandEmpty>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
+              <div>
                 <label htmlFor="studio-city" className="text-sm font-medium">
                   City
                   <span className="block text-xs text-muted-foreground">
@@ -727,26 +1153,6 @@ export default function GeneralSection({
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   placeholder="San Francisco"
-                  maxLength={96}
-                  disabled={savingLocation || !isOwnerOrAdmin}
-                  className={!isOwnerOrAdmin ? 'bg-muted' : ''}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
-              <div>
-                <label htmlFor="studio-country" className="text-sm font-medium">
-                  Country
-                  <span className="block text-xs text-muted-foreground">Used for timezone defaults.</span>
-                </label>
-              </div>
-              <div className="max-w-md">
-                <Input
-                  id="studio-country"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  placeholder="US"
                   maxLength={96}
                   disabled={savingLocation || !isOwnerOrAdmin}
                   className={!isOwnerOrAdmin ? 'bg-muted' : ''}
