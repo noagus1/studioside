@@ -15,9 +15,14 @@ import { Link2 } from 'lucide-react'
 interface InviteMembersModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onInvitesSent?: () => void | Promise<void>
 }
 
-export function InviteMembersModal({ open, onOpenChange }: InviteMembersModalProps) {
+export function InviteMembersModal({
+  open,
+  onOpenChange,
+  onInvitesSent,
+}: InviteMembersModalProps) {
   const [emailInput, setEmailInput] = React.useState('')
   const [emails, setEmails] = React.useState<string[]>([])
   const [selectedRole, setSelectedRole] = React.useState<MembershipRole>('member')
@@ -150,6 +155,9 @@ export function InviteMembersModal({ open, onOpenChange }: InviteMembersModalPro
       // Show results
       if (successCount > 0) {
         toast.success(`Invites sent! ${successCount} invite${successCount > 1 ? 's' : ''} sent.`)
+        if (onInvitesSent) {
+          await onInvitesSent()
+        }
       }
 
       if (errors.length > 0) {

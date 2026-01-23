@@ -12,15 +12,17 @@
 import { getUserProfile } from '@/data/getUserProfile'
 import { getUserStudios } from '@/data/getUserStudios'
 import { getInviteToken } from '@/lib/cookies/inviteToken'
-import { getPendingInviteForEmail } from '@/actions/getPendingInviteForEmail'
+import { getPendingInvitesForEmail } from '@/data/getPendingInvitesForEmail'
 
 /**
  * Gets the correct redirect path for the authenticated user based on onboarding status.
  * 
  * Priority:
- * 1. No full_name → `/onboarding/profile`
- * 2. Has full_name but no studios → `/join`
- * 3. Has full_name and studios → `/dashboard`
+ * 1. Invite token → `/join?token=...`
+ * 2. Multiple pending invites → `/invites`
+ * 3. Single pending invite → `/dashboard` (invite-first guard auto-accepts)
+ * 4. No full_name → `/complete-account`
+ * 5. Otherwise → `/dashboard`
  * 
  * @returns Redirect path string
  */
@@ -36,6 +38,17 @@ export async function getOnboardingRedirectPath(): Promise<string> {
     const userProfile = await getUserProfile()
     const hasPassword = userProfile?.has_password ?? false
     const userEmail = userProfile?.email ?? null
+
+    // If there are multiple pending invites, force a choice first
+    if (userEmail) {
+      const pendingInvites = await getPendingInvitesForEmail(userEmail)
+      if (pendingInvites.length > 1) {
+        return '/invites'
+      }
+      if (pendingInvites.length === 1) {
+        return '/dashboard'
+      }
+    }
     
     // If no profile or missing basics, send to completion page
     // But preserve invite token if present
@@ -53,17 +66,9 @@ export async function getOnboardingRedirectPath(): Promise<string> {
     // Check if user has studios
     const studios = await getUserStudios()
     
-    // If no studios, redirect to join flow
+    // If no studios, send to dashboard (empty state will guide creation)
     if (studios.length === 0) {
-      // Try to find a pending invite by email to keep invitees out of welcome
-      if (userEmail) {
-        const pendingInvite = await getPendingInviteForEmail(userEmail)
-        if (pendingInvite) {
-          return '/join'
-        }
-      }
-
-      return '/join'
+      return '/dashboard'
     }
     
     // User has completed onboarding, redirect to dashboard

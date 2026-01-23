@@ -6,7 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Camera, Check, ChevronDown, Loader2, Search } from 'lucide-react'
-import { getTeamData, type TeamData } from '@/actions/getTeamData'
+import { getTeamData, type TeamData, type TeamDataError, type TeamMember } from '@/actions/getTeamData'
+import { resendStudioInvite } from '@/actions/resendStudioInvite'
+import { revokeStudioInvite } from '@/actions/revokeStudioInvite'
+import { removeStudioMember } from '@/actions/removeStudioMember'
+import { updateMembershipRole } from '@/actions/updateMembershipRole'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SettingsCacheProvider, useSettingsCache } from '@/components/settings/SettingsCacheProvider'
 import GeneralSection from '@/components/settings/sections/GeneralSection'
@@ -63,6 +67,7 @@ type RoleValue = (typeof ROLE_OPTIONS)[number]['value']
 
 interface StudioOverviewPageClientProps {
   studioSettings: StudioSettingsData
+  initialTeamData?: TeamData | TeamDataError
 }
 
 function resolveInitialSection(searchParams: URLSearchParams): SectionKey {
@@ -73,6 +78,7 @@ function resolveInitialSection(searchParams: URLSearchParams): SectionKey {
 
 function StudioOverviewContent({
   studioSettings,
+  initialTeamData,
 }: StudioOverviewPageClientProps) {
   const { refreshCache } = useSettingsCache()
   const searchParams = useSearchParams()
@@ -83,9 +89,20 @@ function StudioOverviewContent({
   const isOwnerOrAdmin = studioSettings.isOwnerOrAdmin
   const memberCount = typeof studioSettings.memberCount === 'number' ? studioSettings.memberCount : 0
   const memberLabel = `${memberCount} ${memberCount === 1 ? 'member' : 'members'}`
-  const [teamData, setTeamData] = React.useState<TeamData | null>(null)
-  const [teamError, setTeamError] = React.useState<string | null>(null)
-  const [teamLoading, setTeamLoading] = React.useState(true)
+  const initialTeamError =
+    initialTeamData && 'error' in initialTeamData ? initialTeamData.message : null
+  const initialTeamValue =
+    initialTeamData && !('error' in initialTeamData) ? initialTeamData : null
+  const hasInitialTeamData = !!initialTeamData
+  const [teamData, setTeamData] = React.useState<TeamData | null>(initialTeamValue)
+  const [teamError, setTeamError] = React.useState<string | null>(initialTeamError)
+  const [teamLoading, setTeamLoading] = React.useState(!hasInitialTeamData)
+  const [inviteBusyId, setInviteBusyId] = React.useState<string | null>(null)
+  const [memberBusyId, setMemberBusyId] = React.useState<string | null>(null)
+  const [memberToRemove, setMemberToRemove] = React.useState<TeamMember | null>(null)
+  const invitedCount = teamData?.pendingInvites?.length ?? 0
+  const invitedLabel = `${invitedCount} ${invitedCount === 1 ? 'invited' : 'invited'}`
+  const hasInvites = invitedCount > 0
   const [searchTerm, setSearchTerm] = React.useState('')
   const [inviteOpen, setInviteOpen] = React.useState(false)
   const [roleOverrides, setRoleOverrides] = React.useState<Record<string, RoleValue>>({})
@@ -398,7 +415,9 @@ function StudioOverviewContent({
     let mounted = true
     const loadTeam = async () => {
       try {
-        setTeamLoading(true)
+        if (!hasInitialTeamData) {
+          setTeamLoading(true)
+        }
         const result = await getTeamData()
         if (!mounted) return
         if ('error' in result) {
@@ -413,7 +432,7 @@ function StudioOverviewContent({
         setTeamError(error instanceof Error ? error.message : 'Unable to load team')
         setTeamData(null)
       } finally {
-        if (mounted) {
+        if (mounted && !hasInitialTeamData) {
           setTeamLoading(false)
         }
       }
@@ -422,7 +441,92 @@ function StudioOverviewContent({
     return () => {
       mounted = false
     }
+  }, [hasInitialTeamData])
+
+  const refreshTeamData = React.useCallback(async () => {
+    try {
+      const result = await getTeamData()
+      if ('error' in result) {
+        setTeamError(result.message)
+        setTeamData(null)
+      } else {
+        setTeamData(result)
+        setTeamError(null)
+      }
+    } catch (error) {
+      setTeamError(error instanceof Error ? error.message : 'Unable to load team')
+      setTeamData(null)
+    }
   }, [])
+
+  const handleResendInvite = async (inviteId: string) => {
+    if (!isOwnerOrAdmin) return
+    setInviteBusyId(inviteId)
+    const result = await resendStudioInvite(inviteId)
+    if ('error' in result) {
+      toast.error(result.message || 'Unable to resend invite')
+    } else {
+      toast.success('Invite resent')
+      try {
+        await navigator.clipboard.writeText(result.inviteUrl)
+        toast.success('Invite link copied')
+      } catch {
+        /* ignore clipboard failure */
+      }
+      await refreshTeamData()
+    }
+    setInviteBusyId(null)
+  }
+
+  const handleCancelInvite = async (inviteId: string) => {
+    if (!isOwnerOrAdmin) return
+    setInviteBusyId(inviteId)
+    const result = await revokeStudioInvite(inviteId)
+    if ('error' in result) {
+      toast.error(result.message || 'Unable to cancel invite')
+    } else {
+      toast.success('Invitation cancelled')
+      await refreshTeamData()
+    }
+    setInviteBusyId(null)
+  }
+
+  const handleChangeRole = async (member: TeamMember, role: RoleValue) => {
+    if (!isOwnerOrAdmin || member.role === role) return
+    setMemberBusyId(member.id)
+    const result = await updateMembershipRole(member.id, role)
+    if ('error' in result) {
+      toast.error(result.message || 'Unable to update role')
+    } else {
+      toast.success('Role updated')
+      setRoleOverrides((prev) => {
+        const next = { ...prev }
+        delete next[member.id]
+        return next
+      })
+      await refreshTeamData()
+    }
+    setMemberBusyId(null)
+  }
+
+  const handleRemoveMember = async (member: TeamMember) => {
+    if (!isOwnerOrAdmin) return
+    setMemberBusyId(member.id)
+    const result = await removeStudioMember(member.id)
+    if ('error' in result) {
+      toast.error(result.message || 'Unable to remove member')
+    } else {
+      toast.success('Member removed')
+      await refreshTeamData()
+    }
+    setMemberBusyId(null)
+  }
+
+  const confirmRemoveMember = async () => {
+    if (!memberToRemove) return
+    await handleRemoveMember(memberToRemove)
+    setMemberToRemove(null)
+  }
 
   const sortedMembers = React.useMemo(() => {
     if (!teamData?.members) return []
@@ -499,6 +603,7 @@ function StudioOverviewContent({
       if (role === 'admin') return 'Manager'
       return 'Member'
     }
+    const canAssignOwner = teamData?.currentUserRole === 'owner'
 
     return (
       <div className="space-y-3">
@@ -533,6 +638,10 @@ function StudioOverviewContent({
               const isCurrentUser = teamData?.currentUserId && member.user.id === teamData.currentUserId
               const nameWithIndicator = isCurrentUser ? `${displayName} (You)` : displayName
               const currentRole = normalizeRole(roleOverrides[member.id] || member.role)
+              const allowRoleChange = isOwnerOrAdmin && member.role !== 'owner'
+              const allowRemoval =
+                isOwnerOrAdmin && member.role !== 'owner' && member.user.id !== teamData?.currentUserId
+              const isRemovalBusy = memberBusyId === member.id
 
               return (
                 <div
@@ -551,11 +660,12 @@ function StudioOverviewContent({
                   </div>
                   <div className="flex">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                      <DropdownMenuTrigger asChild disabled={member.role === 'owner'}>
                         <button
                           type="button"
                           className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-2.5 py-2 text-sm font-normal leading-none text-foreground shadow-none ring-offset-background placeholder:text-muted-foreground transition hover:bg-muted/60 focus:outline-none focus:border-ring focus:ring-0 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1"
                           aria-label="Change member role"
+                          disabled={member.role === 'owner'}
                         >
                           <span className="capitalize">{roleLabel(currentRole)}</span>
                           <ChevronDown className="h-4 w-4 text-muted-foreground opacity-70" />
@@ -566,21 +676,19 @@ function StudioOverviewContent({
                         className="w-[160px] rounded-md border border-input bg-popover p-1 text-popover-foreground shadow-md"
                       >
                         <div className="flex flex-col gap-0.5">
-                          {ROLE_OPTIONS.map((option) => {
+                          {ROLE_OPTIONS.filter((option) =>
+                            option.value === 'owner' ? canAssignOwner : true
+                          ).map((option) => {
                             const isActive = currentRole === option.value
                             return (
                               <DropdownMenuItem
                                 key={option.value}
-                                onSelect={() =>
-                                  setRoleOverrides((prev) => ({
-                                    ...prev,
-                                    [member.id]: normalizeRole(option.value),
-                                  }))
-                                }
+                                onSelect={() => handleChangeRole(member, option.value)}
                                 className={cn(
                                   'flex w-full cursor-pointer select-none items-center rounded-sm px-2.5 py-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
                                   isActive && 'bg-muted/60'
                                 )}
+                                disabled={!allowRoleChange || isRemovalBusy || isActive}
                               >
                                 {option.label}
                               </DropdownMenuItem>
@@ -589,13 +697,11 @@ function StudioOverviewContent({
                         </div>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          onSelect={(event) => {
-                            event.preventDefault()
-                            toast.info('Customize roles coming soon')
-                          }}
-                          className="flex w-full cursor-default select-none items-center rounded-sm px-2.5 py-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground"
+                          onSelect={() => setMemberToRemove(member)}
+                          disabled={!allowRemoval || isRemovalBusy}
+                          className="flex w-full cursor-pointer select-none items-center rounded-sm px-2.5 py-2 text-sm text-destructive outline-none focus:bg-accent focus:text-destructive data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                         >
-                          Customize
+                          Remove member
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -759,7 +865,73 @@ function StudioOverviewContent({
               </div>
               {isSavingName && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             </div>
-            <p className="text-sm text-muted-foreground/90">{memberLabel}</p>
+            <p className="text-sm text-muted-foreground/90">
+              {memberLabel}{' '}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-sm text-muted-foreground/90 transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                      !hasInvites && 'cursor-default hover:text-muted-foreground/90'
+                    )}
+                    disabled={!hasInvites}
+                    aria-label="View pending invites"
+                  >
+                    {invitedLabel}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-72 space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">Pending invites</p>
+                    <p className="text-xs text-muted-foreground/80">
+                      People invited to join this studio.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {teamData?.pendingInvites?.length ? (
+                      teamData.pendingInvites.map((invite) => (
+                        <div key={invite.id} className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-foreground">{invite.email}</p>
+                            <p className="text-xs text-muted-foreground/70 capitalize">{invite.role}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {isOwnerOrAdmin ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleResendInvite(invite.id)}
+                                  disabled={inviteBusyId === invite.id}
+                                >
+                                  Resend
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => handleCancelInvite(invite.id)}
+                                  disabled={inviteBusyId === invite.id}
+                                >
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              <span className="rounded-full bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground/80">
+                                Invited
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground/90">No pending invites.</p>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </p>
           </div>
         </div>
       </div>
@@ -805,7 +977,11 @@ function StudioOverviewContent({
 
         <TabsContent value="team" className="space-y-6">
           {renderTeamTable()}
-          <InviteMembersModal open={inviteOpen} onOpenChange={setInviteOpen} />
+          <InviteMembersModal
+            open={inviteOpen}
+            onOpenChange={setInviteOpen}
+            onInvitesSent={refreshTeamData}
+          />
         </TabsContent>
 
         <TabsContent value="rooms" className="space-y-6" />
@@ -845,6 +1021,35 @@ function StudioOverviewContent({
             </Button>
             <Button variant="destructive" onClick={handleConfirmNameChange} disabled={isSavingName}>
               {isSavingName ? 'Saving…' : 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!memberToRemove} onOpenChange={(open) => !open && setMemberToRemove(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove member</DialogTitle>
+            <DialogDescription>
+              {memberToRemove
+                ? `Remove ${memberToRemove.user.full_name || memberToRemove.user.email || 'this user'} from the studio?`
+                : 'Remove this member from the studio?'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setMemberToRemove(null)}
+              disabled={memberToRemove ? memberBusyId === memberToRemove.id : false}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmRemoveMember}
+              disabled={!memberToRemove || (memberToRemove ? memberBusyId === memberToRemove.id : false)}
+            >
+              Remove
             </Button>
           </DialogFooter>
         </DialogContent>

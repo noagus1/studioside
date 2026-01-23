@@ -2,13 +2,14 @@
  * Get User Studios
  * 
  * Returns all studios that the current authenticated user belongs to.
- * Uses RLS to ensure users can only see studios they are members of.
+ * Uses the admin client to avoid RLS dependencies on legacy tables.
  * 
  * ⚠️ Server-only function. Must be called from Server Actions or Route Handlers.
  */
 
 import { redirect } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase/serverClient'
+import { admin } from '@/lib/supabase/adminClient'
 import type { MembershipRole } from '@/types/db'
 
 /**
@@ -32,9 +33,8 @@ export interface UserStudio {
 /**
  * Gets all studios that the current authenticated user belongs to.
  * 
- * The function uses RLS policies to automatically filter memberships
- * to only those where the user is a member. Results are sorted by
- * studio creation date (newest first).
+ * The function queries memberships by user_id and joins studio details.
+ * Results are sorted by studio creation date (newest first).
  * 
  * @returns Array of user's studio memberships with studio details
  * @throws Error if user is not authenticated
@@ -58,8 +58,8 @@ export async function getUserStudios(): Promise<UserStudio[]> {
   }
 
   // Query memberships with studio details
-  // RLS will automatically filter to only studios where user is a member
-  const { data, error } = await supabase
+  // Use admin client to bypass RLS dependencies on studio_memberships
+  const { data, error } = await admin
     .from('studio_users')
     .select(`
       studio_id,

@@ -8,6 +8,7 @@
  */
 
 import { getSupabaseClient } from '@/lib/supabase/serverClient'
+import { admin } from '@/lib/supabase/adminClient'
 import { getCurrentStudioId } from '@/lib/cookies/currentStudio'
 import type { Studio } from '@/types/studio'
 
@@ -52,21 +53,23 @@ export async function getCurrentStudio(): Promise<Studio | null> {
     return null
   }
 
-  // Ensure RLS context is explicitly set before querying
-  // This is critical for RLS policies that depend on current_studio_id()
-  try {
-    await supabase.rpc('set_current_studio_id', { studio_uuid: studioId })
-  } catch (error) {
-    // Log but don't fail - RLS context may already be set by getSupabaseClient()
-    // However, explicitly setting it ensures it's available for the query
-    console.warn('Failed to set current_studio_id in session (getCurrentStudio):', error)
+  const { data: membership, error: membershipError } = await admin
+    .from('studio_users')
+    .select('id')
+    .eq('studio_id', studioId)
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  if (membershipError) {
+    throw new Error(`Failed to verify membership: ${membershipError.message}`)
   }
 
-  // Query the studio
-  // RLS will ensure:
-  // 1. studio_id matches current_studio_id()
-  // 2. user is a member of the studio
-  const { data, error } = await supabase
+  if (!membership) {
+    return null
+  }
+
+  const { data, error } = await admin
     .from('studios')
     .select('*')
     .eq('id', studioId)
@@ -74,7 +77,7 @@ export async function getCurrentStudio(): Promise<Studio | null> {
 
   if (error) {
     // If error is "not found" or RLS violation, return null
-    if (error.code === 'PGRST116' || error.message.includes('row-level security')) {
+    if (error.code === 'PGRST116') {
       return null
     }
     throw new Error(`Failed to fetch current studio: ${error.message}`)

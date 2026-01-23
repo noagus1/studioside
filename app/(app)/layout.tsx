@@ -9,6 +9,9 @@ import { getMembership } from '@/data/getMembership'
 import { getUserProfile } from '@/data/getUserProfile'
 import { CreateButtonHeader } from '@/components/CreateButtonHeader'
 import { AppContentShell } from './AppContentShell'
+import { resolveStudioAccess } from '@/lib/auth/resolveStudioAccess'
+import NoStudiosState from './NoStudiosState'
+import StudioPickerModal from './StudioPickerModal'
 
 /**
  * Layout for Authenticated Routes
@@ -34,6 +37,15 @@ export default async function AppLayout({
 
   if (!user) {
     redirect('/login')
+  }
+
+  const access = await resolveStudioAccess()
+  if (access.state === 'no-studios') {
+    return <NoStudiosState />
+  }
+
+  if (access.state === 'needs-picker') {
+    return <StudioPickerModal studios={access.studios} />
   }
 
   // Fetch membership for role data

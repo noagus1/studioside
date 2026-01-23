@@ -5,7 +5,6 @@ import { getCurrentStudio } from '@/data/getCurrentStudio'
 import { getUserProfile } from '@/data/getUserProfile'
 import StudioSwitcher from '@/components/StudioSwitcher'
 import { PageColumns, PageContainer, MainColumn, SideColumn } from '@/components/layout/PageColumns'
-import { AutoSelectStudio } from './components/AutoSelectStudio'
 
 import { getRecentActivity, getStudioOverview, getTodaySessions, getUpcomingSessions } from './actions'
 import { SessionsPanel } from './components/SessionsPanel'
@@ -46,20 +45,11 @@ export default async function DashboardPage() {
   
   const studios = await getUserStudios()
   
-  // Redirect to join flow if user has no studios
-  if (studios.length === 0) {
-    redirect('/join')
-  }
-  
   // Get current studio - getCurrentStudio() will ensure RLS context is set
   // The getSupabaseClient() call inside getCurrentStudio() already sets RLS context
   // from the cookie, but we explicitly set it again in getCurrentStudio() for safety
   let currentStudio = await getCurrentStudio()
   
-  // If no valid studio is available, auto-select one client-side
-  // This covers missing cookies and stale/invalid studio IDs.
-  const needsAutoSelect = !currentStudio && studios.length > 0
-
   // Check if onboarding is complete (has rooms OR team members beyond owner)
   let showWelcomeModal = false
   if (currentStudio) {
@@ -131,8 +121,6 @@ export default async function DashboardPage() {
         />
       )}
 
-      {needsAutoSelect && <AutoSelectStudio studios={studios} />}
-
       <PageColumns variant="two">
         <MainColumn>
           <div className="flex flex-col gap-3">
@@ -161,16 +149,12 @@ export default async function DashboardPage() {
               <SessionsPanel todaySessions={todaySessions} upcomingSessions={upcomingSessions} />
               <RecentActivity activities={activities} />
             </>
-          ) : needsAutoSelect ? (
+          ) : (
             <div className="text-center py-12">
               <div className="flex flex-col items-center gap-4">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                 <p className="text-muted-foreground">Loading studio...</p>
               </div>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">No studio selected</p>
             </div>
           )}
         </MainColumn>

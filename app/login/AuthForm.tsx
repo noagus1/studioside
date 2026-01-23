@@ -44,6 +44,21 @@ export default function AuthForm() {
   const [showPassword, setShowPassword] = useState(false)
   const intent = searchParams.get('intent')
 
+  const normalizeRedirectPath = (value: string | null) => {
+    if (!value) return ''
+    if (value.startsWith('/')) return value
+    if (typeof window === 'undefined') return ''
+    try {
+      const url = new URL(value)
+      if (url.origin !== window.location.origin) {
+        return ''
+      }
+      return `${url.pathname}${url.search}${url.hash}`
+    } catch {
+      return ''
+    }
+  }
+
   async function handleEmailSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setIsLoading(true)
@@ -86,10 +101,11 @@ export default function AuthForm() {
   }
 
   async function handleExistingUserWithoutPassword() {
-    const redirectParam = searchParams.get('redirect') || ''
+    const redirectParam = searchParams.get('redirect')
+    const normalizedRedirect = normalizeRedirectPath(redirectParam)
     // Preserve invite token if present in redirect param
-    if (redirectParam.includes('/join') && redirectParam.includes('token=')) {
-      await preserveInviteTokenFromPath(redirectParam)
+    if (normalizedRedirect.includes('/join') && normalizedRedirect.includes('token=')) {
+      await preserveInviteTokenFromPath(normalizedRedirect)
     }
 
     const origin =
@@ -97,7 +113,7 @@ export default function AuthForm() {
         ? window.location.origin
         : process.env.NEXT_PUBLIC_SITE_URL || ''
     // Preserve the original redirect if it exists, otherwise go to complete-account
-    const nextPath = redirectParam || '/complete-account'
+    const nextPath = normalizedRedirect || '/complete-account'
     const redirectTo = origin
       ? `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`
       : `/auth/callback?next=${encodeURIComponent(nextPath)}`
@@ -111,7 +127,16 @@ export default function AuthForm() {
     }
 
     // Navigate to the action link directly to establish a session without email
-    window.location.href = magicLink.actionLink
+    // Ensure the redirect stays on the current origin (localhost in dev).
+    try {
+      const actionUrl = new URL(magicLink.actionLink)
+      if (origin) {
+        actionUrl.searchParams.set('redirect_to', redirectTo)
+      }
+      window.location.href = actionUrl.toString()
+    } catch {
+      window.location.href = magicLink.actionLink
+    }
   }
 
   async function sendMagicLink(email: string) {
@@ -124,13 +149,14 @@ export default function AuthForm() {
         return
       }
 
-      const redirectParam = searchParams.get('redirect') || ''
+      const redirectParam = searchParams.get('redirect')
+      const normalizedRedirect = normalizeRedirectPath(redirectParam)
       // Preserve invite token if present in redirect param
-      if (redirectParam.includes('/join') && redirectParam.includes('token=')) {
-        await preserveInviteTokenFromPath(redirectParam)
+      if (normalizedRedirect.includes('/join') && normalizedRedirect.includes('token=')) {
+        await preserveInviteTokenFromPath(normalizedRedirect)
       }
       
-      const nextPath = redirectParam || ''
+      const nextPath = normalizedRedirect || ''
       const redirectTo = typeof window !== 'undefined'
         ? `${window.location.origin}/auth/callback${nextPath ? `?next=${encodeURIComponent(nextPath)}` : ''}`
         : `/auth/callback${nextPath ? `?next=${encodeURIComponent(nextPath)}` : ''}`
@@ -300,7 +326,7 @@ export default function AuthForm() {
     }
 
     // Get redirect URL - use query param if provided, otherwise use onboarding redirect path
-    const redirectParam = searchParams.get('redirect')
+    const redirectParam = normalizeRedirectPath(searchParams.get('redirect'))
     if (redirectParam) {
       // Preserve invite token if present in redirect param
       if (redirectParam.includes('/join') && redirectParam.includes('token=')) {

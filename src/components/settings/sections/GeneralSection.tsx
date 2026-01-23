@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { toast } from 'sonner'
-import { MapPin, ChevronDown } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -319,7 +319,6 @@ export default function GeneralSection({
   const [fullAddressOpen, setFullAddressOpen] = React.useState(false)
   // Saving states
   const [savingContact, setSavingContact] = React.useState(false)
-  const [savingScheduling, setSavingScheduling] = React.useState(false)
   const [savingLocation, setSavingLocation] = React.useState(false)
   const [timezoneManuallySet, setTimezoneManuallySet] = React.useState(false)
 
@@ -339,7 +338,7 @@ export default function GeneralSection({
   const [timezonePreview, setTimezonePreview] = React.useState('')
 
   const showInformation = view === 'all' || view === 'general'
-  const showScheduling = view === 'all' || view === 'scheduling'
+  const showTimezone = showInformation
 
   // Load initial data
   React.useEffect(() => {
@@ -407,7 +406,7 @@ export default function GeneralSection({
 
   // Update timezone preview
   React.useEffect(() => {
-    if (!showScheduling) {
+    if (!showTimezone) {
       setTimezonePreview('')
       return
     }
@@ -429,11 +428,11 @@ export default function GeneralSection({
         setTimezonePreview('Invalid timezone')
       }
     }
-  }, [showScheduling, timezone])
+  }, [showTimezone, timezone])
 
   // Update preview every second
   React.useEffect(() => {
-    if (!showScheduling) return
+    if (!showTimezone) return
     const interval = setInterval(() => {
       if (timezone) {
         try {
@@ -456,7 +455,7 @@ export default function GeneralSection({
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [showScheduling, timezone])
+  }, [showTimezone, timezone])
 
   React.useEffect(() => {
     setTimezoneManuallySet(false)
@@ -471,9 +470,6 @@ export default function GeneralSection({
     }
   }, [city, state, country, timezone, timezoneManuallySet])
 
-  const hasSchedulingChanges =
-    showScheduling && timezone !== originalValues.current.timezone
-
   const hasContactChanges =
     showInformation &&
     (contactEmail.trim() !== originalValues.current.contact_email ||
@@ -485,7 +481,8 @@ export default function GeneralSection({
       city.trim() !== originalValues.current.city ||
       state.trim() !== originalValues.current.state ||
       postalCode.trim() !== originalValues.current.postal_code ||
-      country.trim() !== originalValues.current.country)
+      country.trim() !== originalValues.current.country ||
+      (showTimezone && timezone !== originalValues.current.timezone))
 
   const handleTimezoneChange = (value: string) => {
     setTimezone(value)
@@ -602,6 +599,7 @@ export default function GeneralSection({
         state: trimmedState || null,
         postal_code: trimmedPostal || null,
         country: trimmedCountry || null,
+        timezone,
       })
 
       if ('error' in result) {
@@ -615,6 +613,7 @@ export default function GeneralSection({
       originalValues.current.state = trimmedState
       originalValues.current.postal_code = trimmedPostal
       originalValues.current.country = trimmedCountry
+      originalValues.current.timezone = timezone
 
       if (data) {
         setData({
@@ -626,6 +625,7 @@ export default function GeneralSection({
             state: trimmedState || null,
             postal_code: trimmedPostal || null,
             country: trimmedCountry || null,
+            timezone,
           },
         })
       }
@@ -638,34 +638,6 @@ export default function GeneralSection({
     }
   }
 
-  // Handle save scheduling section
-  const handleSaveScheduling = async () => {
-    if (!hasSchedulingChanges) return
-
-    setSavingScheduling(true)
-    try {
-      const result = await updateStudio({ timezone })
-
-      if ('error' in result) {
-        toast.error(result.message)
-        setSavingScheduling(false)
-        return
-      }
-
-      // Update original values
-      originalValues.current.timezone = timezone
-      if (data) {
-        setData({ ...data, studio: { ...data.studio, timezone } })
-      }
-
-      toast.success('Timezone saved successfully')
-    } catch (error) {
-      toast.error('Failed to save timezone')
-    } finally {
-      setSavingScheduling(false)
-    }
-  }
-
   // Handle cancel location section
   const handleCancelLocation = () => {
     setStreet(originalValues.current.street)
@@ -674,10 +646,6 @@ export default function GeneralSection({
     setPostalCode(originalValues.current.postal_code)
     setCountry(originalValues.current.country)
     setFullAddressOpen(Boolean(originalValues.current.street || originalValues.current.postal_code))
-  }
-
-  // Handle cancel scheduling section
-  const handleCancelScheduling = () => {
     setTimezone(originalValues.current.timezone)
     setTimezoneManuallySet(false)
   }
@@ -725,16 +693,14 @@ export default function GeneralSection({
       {showInformation && (
         <Card className="shadow-none">
           <CardContent className="p-0">
-            <div className="flex items-center justify-between py-4 px-6 border-b">
-              <div className="flex-1">
+            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
+              <div>
                 <label htmlFor="studio-email" className="text-sm font-medium">
                   Email
+                  <span className="block text-xs text-muted-foreground">Used for studio contact.</span>
                 </label>
-                <p className="text-xs text-muted-foreground mt-1 mr-4">
-                  Studio contact email address
-                </p>
               </div>
-              <div className="flex-1 max-w-md">
+              <div className="max-w-md">
                 <Input
                   id="studio-email"
                   type="email"
@@ -748,16 +714,14 @@ export default function GeneralSection({
               </div>
             </div>
 
-            <div className="flex items-center justify-between py-4 px-6 border-b">
-              <div className="flex-1">
+            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
+              <div>
                 <label htmlFor="studio-phone" className="text-sm font-medium">
                   Phone
+                  <span className="block text-xs text-muted-foreground">Used for studio contact.</span>
                 </label>
-                <p className="text-xs text-muted-foreground mt-1 mr-4">
-                  Studio contact phone number
-                </p>
               </div>
-              <div className="flex-1 max-w-md">
+              <div className="max-w-md">
                 <Input
                   id="studio-phone"
                   type="tel"
@@ -772,7 +736,7 @@ export default function GeneralSection({
             </div>
 
             {isOwnerOrAdmin && (
-              <div className="flex justify-end gap-2 p-6 pt-4">
+              <div className="flex justify-end gap-2 p-4 pt-3">
                 <Button
                   variant="outline"
                   onClick={handleCancelContact}
@@ -791,26 +755,20 @@ export default function GeneralSection({
 
       {showInformation && (
         <Card className="shadow-none">
-          <CardHeader className="flex flex-col gap-2 pb-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <CardTitle className="text-base font-semibold">Location</CardTitle>
-                <p className="text-sm text-muted-foreground">Used for scheduling, timezone, and invoices.</p>
-              </div>
-            </div>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base font-semibold">Studio Location</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="flex items-center justify-between py-4 px-6 border-b">
-              <div className="flex-1">
+            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
+              <div>
                 <label htmlFor="studio-city" className="text-sm font-medium">
                   City
+                  <span className="block text-xs text-muted-foreground">
+                    Used for scheduling and timezone.
+                  </span>
                 </label>
-                <p className="text-xs text-muted-foreground mt-1 mr-4">
-                  Required for scheduling context and timezone.
-                </p>
               </div>
-              <div className="flex-1 max-w-md">
+              <div className="max-w-md">
                 <Input
                   id="studio-city"
                   value={city}
@@ -823,16 +781,14 @@ export default function GeneralSection({
               </div>
             </div>
 
-            <div className="flex items-center justify-between py-4 px-6 border-b">
-              <div className="flex-1">
+            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
+              <div>
                 <label htmlFor="studio-state" className="text-sm font-medium">
                   State / Region
+                  <span className="block text-xs text-muted-foreground">State or region.</span>
                 </label>
-                <p className="text-xs text-muted-foreground mt-1 mr-4">
-                  State, province, or region for your studio.
-                </p>
               </div>
-              <div className="flex-1 max-w-md">
+              <div className="max-w-md">
                 <Input
                   id="studio-state"
                   value={state}
@@ -845,16 +801,14 @@ export default function GeneralSection({
               </div>
             </div>
 
-            <div className="flex items-center justify-between py-4 px-6 border-b">
-              <div className="flex-1">
+            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
+              <div>
                 <label htmlFor="studio-country" className="text-sm font-medium">
                   Country
+                  <span className="block text-xs text-muted-foreground">Used for timezone defaults.</span>
                 </label>
-                <p className="text-xs text-muted-foreground mt-1 mr-4">
-                  Required for timezone and regional defaults.
-                </p>
               </div>
-              <div className="flex-1 max-w-md">
+              <div className="max-w-md">
                 <Input
                   id="studio-country"
                   value={country}
@@ -867,14 +821,14 @@ export default function GeneralSection({
               </div>
             </div>
 
-            <div className="flex items-center justify-between py-3 px-6 border-b">
-              <div className="flex-1">
-                <p className="text-sm font-medium">Add full address (optional)</p>
-                <p className="text-xs text-muted-foreground mt-1 mr-4">
-                  Street and postal code help with invoices but are not required.
+            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
+              <div>
+                <p className="text-sm font-medium">
+                  Add full address
+                  <span className="block text-xs text-muted-foreground">Optional for invoices.</span>
                 </p>
               </div>
-              <div className="flex-1 max-w-md flex justify-end">
+              <div className="flex justify-end">
                 <Button
                   type="button"
                   variant="ghost"
@@ -896,16 +850,16 @@ export default function GeneralSection({
 
             {fullAddressOpen && (
               <>
-                <div className="flex items-center justify-between py-4 px-6 border-b">
-                  <div className="flex-1">
+                <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
+                  <div>
                     <label htmlFor="studio-street" className="text-sm font-medium">
                       Street
+                      <span className="block text-xs text-muted-foreground">
+                        Optional street address.
+                      </span>
                     </label>
-                    <p className="text-xs text-muted-foreground mt-1 mr-4">
-                      Building number and street (optional).
-                    </p>
                   </div>
-                  <div className="flex-1 max-w-md">
+                  <div className="max-w-md">
                     <Input
                       id="studio-street"
                       value={street}
@@ -918,16 +872,16 @@ export default function GeneralSection({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between py-4 px-6 border-b last:border-b-0">
-                  <div className="flex-1">
+                <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b last:border-b-0">
+                  <div>
                     <label htmlFor="studio-postal" className="text-sm font-medium">
                       Postal code
+                      <span className="block text-xs text-muted-foreground">
+                        Optional postal code.
+                      </span>
                     </label>
-                    <p className="text-xs text-muted-foreground mt-1 mr-4">
-                      ZIP or postal code (optional).
-                    </p>
                   </div>
-                  <div className="flex-1 max-w-md">
+                  <div className="max-w-md">
                     <Input
                       id="studio-postal"
                       value={postalCode}
@@ -942,46 +896,22 @@ export default function GeneralSection({
               </>
             )}
 
-            {isOwnerOrAdmin && (
-              <div className="flex justify-end gap-2 p-6 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={handleCancelLocation}
-                  disabled={!hasLocationChanges || savingLocation}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveLocation} disabled={!hasLocationChanges || savingLocation}>
-                  {savingLocation ? 'Saving...' : 'Save'}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {showScheduling && (
-        <Card className="shadow-none">
-          <CardContent className="p-0">
-            <div className="flex items-center justify-between py-4 px-6 border-b last:border-b-0">
-              <div className="flex-1">
+            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-4 py-2.5 border-b">
+              <div>
                 <label htmlFor="timezone" className="text-sm font-medium">
                   Timezone
+                  <span className="block text-xs text-muted-foreground">
+                    Derived from address; override if needed.
+                  </span>
                 </label>
-                <p className="text-xs text-muted-foreground mt-1 mr-4">
-                  Set the default timezone for this studio.
-                </p>
               </div>
-              <div className="flex-1 max-w-md">
+              <div className="max-w-md">
                 <Select
                   value={timezone}
                   onValueChange={handleTimezoneChange}
-                  disabled={savingScheduling || !isOwnerOrAdmin}
+                  disabled={savingLocation || !isOwnerOrAdmin}
                 >
-                  <SelectTrigger
-                    id="timezone"
-                    className={!isOwnerOrAdmin ? 'bg-muted' : ''}
-                  >
+                  <SelectTrigger id="timezone" className={!isOwnerOrAdmin ? 'bg-muted' : ''}>
                     <SelectValue placeholder="Select timezone" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1001,25 +931,23 @@ export default function GeneralSection({
             </div>
 
             {isOwnerOrAdmin && (
-              <div className="flex justify-end gap-2 p-6 pt-4">
+              <div className="flex justify-end gap-2 p-4 pt-3">
                 <Button
                   variant="outline"
-                  onClick={handleCancelScheduling}
-                  disabled={!hasSchedulingChanges || savingScheduling}
+                  onClick={handleCancelLocation}
+                  disabled={!hasLocationChanges || savingLocation}
                 >
                   Cancel
                 </Button>
-                <Button
-                  onClick={handleSaveScheduling}
-                  disabled={!hasSchedulingChanges || savingScheduling}
-                >
-                  {savingScheduling ? 'Saving...' : 'Save'}
+                <Button onClick={handleSaveLocation} disabled={!hasLocationChanges || savingLocation}>
+                  {savingLocation ? 'Saving...' : 'Save'}
                 </Button>
               </div>
             )}
           </CardContent>
         </Card>
       )}
+
     </div>
   )
 }

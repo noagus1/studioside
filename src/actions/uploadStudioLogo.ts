@@ -151,7 +151,7 @@ export async function uploadStudioLogo(
       if (fallbackError) {
         return {
           error: 'STORAGE_ERROR',
-          message: 'Studio logo storage bucket not configured. Please create a "studio-logos" or "avatars" bucket in Supabase Storage.',
+          message: `Failed to upload logo to avatars bucket: ${fallbackError.message}`,
         }
       }
 

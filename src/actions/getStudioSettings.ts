@@ -58,10 +58,10 @@ export async function getStudioSettings(): Promise<StudioSettingsData | StudioSe
     console.warn('Failed to set current_studio_id:', error)
   }
 
-  // Parallelize studio and membership fetches for better performance
+  // Use admin client for studio + membership to avoid studios RLS blocking
+  // non-owner roles. Membership is still validated against the active user.
   const [studioResult, membershipResult] = await Promise.all([
-    // Fetch studio
-    supabase
+    admin
       .from('studios')
       .select('*')
       .eq('id', studioId)
@@ -69,13 +69,13 @@ export async function getStudioSettings(): Promise<StudioSettingsData | StudioSe
     // Get user's membership to check role
     // Query explicitly with both studio_id and user_id to ensure we get the correct membership
     // The UNIQUE constraint on (studio_id, user_id) ensures we get exactly one result
-    supabase
+    admin
       .from('studio_users')
-      .select('role, studio_id, user_id')
+      .select('role, studio_id, user_id, status')
       .eq('studio_id', studioId)
       .eq('user_id', user.id)
       .eq('status', 'active')
-      .maybeSingle()
+      .maybeSingle(),
   ])
 
   const { data: studio, error: studioError } = studioResult
