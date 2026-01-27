@@ -1,3 +1,9 @@
+export default async function HomePage() {
+  console.log('NEXT_PUBLIC_APP_URL:', process.env.NEXT_PUBLIC_APP_URL)
+  // ... rest of your code
+  return <LandingPageClient />
+}
+
 import { redirect } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase/serverClient'
 import { getOnboardingRedirectPath } from '@/actions/getOnboardingRedirectPath'
