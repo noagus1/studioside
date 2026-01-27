@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { autoSelectStudio } from '@/actions/switchStudio'
 import { NextRequest } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * Route Handler for Auto-Selecting Studio
  * 
