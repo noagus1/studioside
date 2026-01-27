@@ -11,6 +11,8 @@ export const dynamic = 'force-dynamic'
  * Used when a user has studios but no studio is currently selected.
  */
 export async function GET(request: NextRequest) {
+  console.log('🔥 auto-select-studio route HIT');
+
   console.log('SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ FOUND' : '❌ MISSING')
   console.log('NEXT_PUBLIC_SUPABASE_ANON_KEY:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ FOUND' : '❌ MISSING')
   // Get redirect path from query params (defaults to /dashboard)
