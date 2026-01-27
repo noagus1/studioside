@@ -23,6 +23,10 @@ const REQUIRED_ENV_VARS = [
 ]
 
 function logEnvStatus() {
+  if (process.env.NODE_ENV === 'production') {
+    return
+  }
+
   const status = REQUIRED_ENV_VARS.reduce<Record<string, boolean>>((acc, key) => {
     acc[key] = Boolean(process.env[key])
     return acc
@@ -34,7 +38,7 @@ function hasRequiredEnvVars(): boolean {
   return REQUIRED_ENV_VARS.every((key) => Boolean(process.env[key]))
 }
 
-function isSafeRedirectPath(path: string): boolean {
+function isSafeRedirectPath(path: unknown): path is string {
   return typeof path === 'string' && path.startsWith('/')
 }
 
@@ -52,9 +56,9 @@ export default async function HomePage() {
 
       if (user && !authError) {
         const redirectPath = await getOnboardingRedirectPath()
-        if (isSafeRedirectPath(redirectPath)) {
+        if (redirectPath && isSafeRedirectPath(redirectPath)) {
           redirect(redirectPath)
-        } else {
+        } else if (redirectPath) {
           console.warn('[landing] invalid redirect path:', redirectPath)
         }
       }
