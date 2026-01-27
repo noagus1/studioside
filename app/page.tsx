@@ -1,9 +1,3 @@
-export default async function HomePage() {
-  console.log('NEXT_PUBLIC_APP_URL:', process.env.NEXT_PUBLIC_APP_URL)
-  // ... rest of your code
-  return <LandingPageClient />
-}
-
 import { redirect } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase/serverClient'
 import { getOnboardingRedirectPath } from '@/actions/getOnboardingRedirectPath'
@@ -22,28 +16,55 @@ import LandingPageClient from './LandingPageClient'
 // Force dynamic rendering since we use cookies for authentication
 export const dynamic = 'force-dynamic'
 
-export default async function HomePage() {
-  // Check for active session
-  try {
-    const supabase = await getSupabaseClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+const REQUIRED_ENV_VARS = [
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+]
 
-    // If user is logged in, redirect to appropriate page
-    if (user && !authError) {
-      const redirectPath = await getOnboardingRedirectPath()
-      redirect(redirectPath)
+function logEnvStatus() {
+  const status = REQUIRED_ENV_VARS.reduce<Record<string, boolean>>((acc, key) => {
+    acc[key] = Boolean(process.env[key])
+    return acc
+  }, {})
+  console.info('[landing] env presence:', status)
+}
+
+function hasRequiredEnvVars(): boolean {
+  return REQUIRED_ENV_VARS.every((key) => Boolean(process.env[key]))
+}
+
+function isSafeRedirectPath(path: string): boolean {
+  return typeof path === 'string' && path.startsWith('/')
+}
+
+export default async function HomePage() {
+  logEnvStatus()
+
+  // Check for active session only if server env is configured.
+  try {
+    if (hasRequiredEnvVars()) {
+      const supabase = await getSupabaseClient()
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+
+      if (user && !authError) {
+        const redirectPath = await getOnboardingRedirectPath()
+        if (isSafeRedirectPath(redirectPath)) {
+          redirect(redirectPath)
+        } else {
+          console.warn('[landing] invalid redirect path:', redirectPath)
+        }
+      }
+    } else {
+      console.warn('[landing] missing env vars; skipping auth check')
     }
   } catch (error) {
-    // If there's an error checking auth (e.g., env vars missing), 
-    // continue to show landing page
-    // This is expected in development or if environment variables are not set
-    console.warn('Error checking auth on root page:', error)
+    // Always fall back to landing page when auth check fails.
+    console.warn('[landing] error checking auth:', error)
   }
 
-  // No active session - render landing page
-  // Client component will handle OAuth tokens in URL hash
   return <LandingPageClient />
 }
