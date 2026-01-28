@@ -96,11 +96,6 @@ export async function updateStudio(
     contact_email?: string | null
     contact_phone?: string | null
     timezone?: string | null
-    street?: string | null
-    city?: string | null
-    state?: string | null
-    postal_code?: string | null
-    country?: string | null
     default_buffer_minutes?: number
     default_session_length_hours?: number
     default_overtime_rate?: number | null
@@ -136,17 +131,6 @@ export async function updateStudio(
     } else {
       updateData.timezone = null
     }
-  }
-
-  // Address fields
-  const sanitizeText = (value?: string | null, maxLength = 128) => {
-    if (value === undefined) return undefined
-    const trimmed = value?.trim() ?? ''
-    if (!trimmed) return null
-    if (trimmed.length > maxLength) {
-      throw new Error(`VALIDATION_ERROR::Value exceeds ${maxLength} characters`)
-    }
-    return trimmed
   }
 
   const sanitizeEmail = (value?: string | null) => {
@@ -186,33 +170,6 @@ export async function updateStudio(
 
     if (contactEmail !== undefined) updateData.contact_email = contactEmail
     if (contactPhone !== undefined) updateData.contact_phone = contactPhone
-
-    const street = sanitizeText(input.street, 160)
-    const city = sanitizeText(input.city, 96)
-    const state = sanitizeText(input.state, 96)
-    const postalCode = sanitizeText(input.postal_code, 32)
-    const country = sanitizeText(input.country, 96)
-
-    if (street !== undefined) updateData.street = street
-    if (city !== undefined) updateData.city = city
-    if (state !== undefined) updateData.state = state
-    if (postalCode !== undefined) updateData.postal_code = postalCode
-    if (country !== undefined) updateData.country = country
-
-    // Location-first validation: require city and country when location is provided
-    const anyLocationProvided = [street, city, state, postalCode, country].some(
-      (v) => v !== undefined
-    )
-    if (anyLocationProvided) {
-      const cityValue = city ?? updateData.city ?? null
-      const countryValue = country ?? updateData.country ?? null
-      if (cityValue === null || countryValue === null) {
-        return {
-          error: 'VALIDATION_ERROR',
-          message: 'City and country are required for location',
-        }
-      }
-    }
   } catch (err) {
     if (err instanceof Error && err.message.startsWith('VALIDATION_ERROR::')) {
       return {

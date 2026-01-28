@@ -21,11 +21,6 @@ export interface Studio {
   contact_email: string | null
   contact_phone: string | null
   timezone: string | null
-  street: string | null
-  city: string | null
-  state: string | null
-  postal_code: string | null
-  country: string | null
   default_buffer_minutes: number | null
   default_session_length_hours: number | null
   default_overtime_rate: number | null
@@ -69,11 +64,6 @@ export interface UpdateStudioInput {
   contact_email?: string | null
   contact_phone?: string | null
   timezone?: string
-  street?: string | null
-  city?: string | null
-  state?: string | null
-  postal_code?: string | null
-  country?: string | null
   default_buffer_minutes?: number
   default_session_length_hours?: number
   default_overtime_rate?: number | null
