@@ -5,38 +5,18 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Card, CardContent } from '@/components/ui/card'
 import { getStudioSettings, type StudioSettingsData } from '@/actions/getStudioSettings'
 import { updateStudio } from '@/actions/updateStudio'
+import { updateStudioAddress } from '@/actions/updateStudioAddress'
 import type { MembershipRole } from '@/types/db'
 import { cn } from '@/lib/utils'
-
-// Common timezones list
-const TIMEZONES = [
-  { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
-  { value: 'America/New_York', label: 'Eastern Time (US & Canada)' },
-  { value: 'America/Chicago', label: 'Central Time (US & Canada)' },
-  { value: 'America/Denver', label: 'Mountain Time (US & Canada)' },
-  { value: 'America/Los_Angeles', label: 'Pacific Time (US & Canada)' },
-  { value: 'America/Phoenix', label: 'Arizona' },
-  { value: 'America/Anchorage', label: 'Alaska' },
-  { value: 'Pacific/Honolulu', label: 'Hawaii' },
-  { value: 'Europe/London', label: 'London' },
-  { value: 'Europe/Paris', label: 'Paris' },
-  { value: 'Europe/Berlin', label: 'Berlin' },
-  { value: 'Europe/Rome', label: 'Rome' },
-  { value: 'Asia/Tokyo', label: 'Tokyo' },
-  { value: 'Asia/Shanghai', label: 'Shanghai' },
-  { value: 'Asia/Dubai', label: 'Dubai' },
-  { value: 'Australia/Sydney', label: 'Sydney' },
-  { value: 'Australia/Melbourne', label: 'Melbourne' },
-]
 
 // Lightweight formatter to keep phone input readable while typing
 const formatPhoneInput = (value: string) => {
@@ -91,6 +71,65 @@ const getDetectedTimezone = () => {
   }
 }
 
+type AddressSuggestion = {
+  id: string
+  label: string
+  street: string
+  city: string
+  state: string
+  postal_code: string
+  country: string
+  lat?: number
+  lng?: number
+}
+
+const MOCK_ADDRESS_SUGGESTIONS: AddressSuggestion[] = [
+  {
+    id: 'address-1',
+    label: '128 2nd Ave N, Nashville, TN 37201, US',
+    street: '128 2nd Ave N',
+    city: 'Nashville',
+    state: 'TN',
+    postal_code: '37201',
+    country: 'US',
+    lat: 36.1632,
+    lng: -86.7789,
+  },
+  {
+    id: 'address-2',
+    label: '311 Broadway, New York, NY 10007, US',
+    street: '311 Broadway',
+    city: 'New York',
+    state: 'NY',
+    postal_code: '10007',
+    country: 'US',
+    lat: 40.7163,
+    lng: -74.0066,
+  },
+  {
+    id: 'address-3',
+    label: '1740 W 2nd Ave, Vancouver, BC V6J 1H6, CA',
+    street: '1740 W 2nd Ave',
+    city: 'Vancouver',
+    state: 'BC',
+    postal_code: 'V6J 1H6',
+    country: 'CA',
+    lat: 49.2684,
+    lng: -123.1689,
+  },
+  {
+    id: 'address-4',
+    label: '4-1-1 Shibaura, Minato City, Tokyo 108-0023, JP',
+    street: '4-1-1 Shibaura',
+    city: 'Tokyo',
+    state: 'Tokyo',
+    postal_code: '108-0023',
+    country: 'JP',
+    lat: 35.6412,
+    lng: 139.7546,
+  },
+]
+
 interface GeneralSectionProps {
   userRole: MembershipRole | null
   initialData?: StudioSettingsData | null
@@ -107,34 +146,31 @@ export default function GeneralSection({
   const [loading, setLoading] = React.useState(true)
   const [data, setData] = React.useState<StudioSettingsData | null>(null)
   const containerClassName = className ?? 'pl-10 pr-10 pt-6 pb-6 space-y-6'
+  const emailInputRef = React.useRef<HTMLInputElement>(null)
 
   // Form state
   const [contactEmail, setContactEmail] = React.useState('')
   const [contactPhone, setContactPhone] = React.useState('')
   const [timezone, setTimezone] = React.useState('UTC')
+  const [isEditingContact, setIsEditingContact] = React.useState(false)
   // Saving states
   const [savingContact, setSavingContact] = React.useState(false)
-  const [savingLocation, setSavingLocation] = React.useState(false)
+  const [savingAddress, setSavingAddress] = React.useState(false)
+
+  const [isAddressModalOpen, setIsAddressModalOpen] = React.useState(false)
+  const [addressQuery, setAddressQuery] = React.useState('')
 
   // Track original values to detect changes
   const originalValues = React.useRef({
     contact_email: '',
     contact_phone: '',
-    timezone: 'UTC',
   })
 
   const showInformation = view === 'all' || view === 'general'
-  const showTimezone = showInformation
   const detectedTimezone = React.useMemo(() => {
     const tz = getDetectedTimezone()
     return isValidTimezone(tz) ? tz : 'UTC'
   }, [])
-  const timezoneOptions = React.useMemo(() => {
-    if (detectedTimezone && !TIMEZONES.some((option) => option.value === detectedTimezone)) {
-      return [{ value: detectedTimezone, label: detectedTimezone }, ...TIMEZONES]
-    }
-    return TIMEZONES
-  }, [detectedTimezone])
 
   // Load initial data
   React.useEffect(() => {
@@ -154,7 +190,6 @@ export default function GeneralSection({
         originalValues.current = {
           contact_email: initialData.studio.contact_email || '',
           contact_phone: formatPhoneInput(initialData.studio.contact_phone || ''),
-          timezone: defaultTimezone,
         }
         setLoading(false)
         return
@@ -177,7 +212,6 @@ export default function GeneralSection({
       originalValues.current = {
         contact_email: result.studio.contact_email || '',
         contact_phone: formatPhoneInput(result.studio.contact_phone || ''),
-        timezone: defaultTimezone,
       }
       setLoading(false)
     }
@@ -188,15 +222,6 @@ export default function GeneralSection({
     showInformation &&
     (contactEmail.trim() !== originalValues.current.contact_email ||
       contactPhone.trim() !== originalValues.current.contact_phone)
-
-  const hasLocationChanges =
-    showInformation &&
-    showTimezone &&
-    timezone !== originalValues.current.timezone
-
-  const handleTimezoneChange = (value: string) => {
-    setTimezone(value)
-  }
 
   const handleSaveContact = async () => {
     if (!hasContactChanges) return
@@ -260,6 +285,7 @@ export default function GeneralSection({
       }
 
       toast.success('Contact info saved')
+      setIsEditingContact(false)
     } catch (error) {
       toast.error('Failed to save contact info')
     } finally {
@@ -270,53 +296,87 @@ export default function GeneralSection({
   const handleCancelContact = () => {
     setContactEmail(originalValues.current.contact_email)
     setContactPhone(originalValues.current.contact_phone)
+    setIsEditingContact(false)
   }
 
-  // Handle save location section
-  const handleSaveLocation = async () => {
-    if (!hasLocationChanges) return
+  const handleEditContact = () => {
+    setIsEditingContact(true)
+    emailInputRef.current?.focus()
+    emailInputRef.current?.select()
+  }
 
-    if (!timezone || !isValidTimezone(timezone)) {
-      toast.error('Please select a valid timezone')
-      return
+  const filteredAddressSuggestions = React.useMemo(() => {
+    const query = addressQuery.trim().toLowerCase()
+    if (!query) return MOCK_ADDRESS_SUGGESTIONS
+    return MOCK_ADDRESS_SUGGESTIONS.filter((suggestion) =>
+      suggestion.label.toLowerCase().includes(query)
+    )
+  }, [addressQuery])
+
+  const addressLines = React.useMemo(() => {
+    const street = data?.studio.street?.trim()
+    const city = data?.studio.city?.trim()
+    const state = data?.studio.state?.trim()
+    const country = data?.studio.country?.trim()
+    const line1 = street || 'Not set'
+    const line2Parts = [city, state, country].filter(Boolean)
+    const line2 = line2Parts.length ? line2Parts.join(', ') : 'City, State/Province, Country'
+    return { line1, line2 }
+  }, [data])
+
+  const handleAddressModalChange = (open: boolean) => {
+    setIsAddressModalOpen(open)
+    if (open) {
+      setAddressQuery('')
     }
+  }
 
-    setSavingLocation(true)
+  const handleSelectAddress = async (selection: AddressSuggestion) => {
+    if (!isOwnerOrAdmin) return
+    setSavingAddress(true)
     try {
-      const result = await updateStudio({
-        timezone,
+      const result = await updateStudioAddress({
+        address: {
+          street: selection.street,
+          city: selection.city,
+          state: selection.state,
+          postal_code: selection.postal_code,
+          country: selection.country,
+        },
+        lat: selection.lat,
+        lng: selection.lng,
       })
 
       if ('error' in result) {
         toast.error(result.message)
-        setSavingLocation(false)
         return
       }
-
-      originalValues.current.timezone = timezone
 
       if (data) {
         setData({
           ...data,
           studio: {
             ...data.studio,
-            timezone,
+            street: result.address.street,
+            city: result.address.city,
+            state: result.address.state,
+            postal_code: result.address.postal_code,
+            country: result.address.country,
+            timezone: result.timezone,
           },
         })
       }
 
-      toast.success('Timezone saved successfully')
+      setTimezone(result.timezone || detectedTimezone)
+      toast.success('Studio location updated')
+      setIsAddressModalOpen(false)
     } catch (error) {
-      toast.error('Failed to save timezone')
+      toast.error('Failed to update studio location')
     } finally {
-      setSavingLocation(false)
+      setSavingAddress(false)
     }
   }
 
-  // Handle cancel location section
-  const handleCancelLocation = () => {
-    setTimezone(originalValues.current.timezone)
-  }
 
 
   const isOwnerOrAdmin = data?.isOwnerOrAdmin ?? false
@@ -355,60 +415,76 @@ export default function GeneralSection({
     <div className={cn(containerClassName)}>
       {!isOwnerOrAdmin && (
         <div className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-          You can view studio info. Admins can update branding and timezone.
+          You can view studio info. Admins can update branding and location.
         </div>
       )}
       {showInformation && (
         <Card className="shadow-none">
           <CardContent className="p-0">
-            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-5 py-3 border-b">
+            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-5 py-3 border-b-0">
               <div>
                 <label htmlFor="studio-email" className="text-sm font-medium">
-                  Email
-                  <span className="block text-xs text-muted-foreground">Used for studio contact.</span>
+                  Contact
+                  <span className="block text-xs text-muted-foreground">
+                  Primary contact details
+                  </span>
                 </label>
               </div>
-              <div className="max-w-md">
-                <Input
-                  id="studio-email"
-                  type="email"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  placeholder="studio@email.com"
-                  maxLength={254}
-                  disabled={savingContact || !isOwnerOrAdmin}
-                  className={!isOwnerOrAdmin ? 'bg-muted' : ''}
-                />
+              <div className="flex items-start justify-between gap-3">
+                {isEditingContact ? (
+                  <div className="max-w-md flex-1 space-y-3">
+                    <Input
+                      id="studio-email"
+                      type="email"
+                      ref={emailInputRef}
+                      value={contactEmail}
+                      onChange={(e) => setContactEmail(e.target.value)}
+                      placeholder="studio@email.com"
+                      maxLength={254}
+                      disabled={savingContact || !isOwnerOrAdmin}
+                      className={!isOwnerOrAdmin ? 'bg-muted' : ''}
+                    />
+                    <Input
+                      id="studio-phone"
+                      type="tel"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(formatPhoneInput(e.target.value))}
+                      placeholder="+1 (555) 123-4567"
+                      maxLength={32}
+                      disabled={savingContact || !isOwnerOrAdmin}
+                      className={!isOwnerOrAdmin ? 'bg-muted' : ''}
+                    />
+                  </div>
+                ) : (
+                  <div className="max-w-md space-y-1">
+                    <p className="text-sm text-foreground">
+                      {contactEmail.trim() || 'Not set'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {contactPhone.trim() || 'Not set'}
+                    </p>
+                  </div>
+                )}
+                {isOwnerOrAdmin && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleEditContact}
+                    disabled={savingContact}
+                    className="h-9"
+                  >
+                    Edit
+                  </Button>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-5 py-3 border-b">
-              <div>
-                <label htmlFor="studio-phone" className="text-sm font-medium">
-                  Phone
-                  <span className="block text-xs text-muted-foreground">Used for studio contact.</span>
-                </label>
-              </div>
-              <div className="max-w-md">
-                <Input
-                  id="studio-phone"
-                  type="tel"
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(formatPhoneInput(e.target.value))}
-                  placeholder="+1 (555) 123-4567"
-                  maxLength={32}
-                  disabled={savingContact || !isOwnerOrAdmin}
-                  className={!isOwnerOrAdmin ? 'bg-muted' : ''}
-                />
-              </div>
-            </div>
-
-            {isOwnerOrAdmin && (
+            {isOwnerOrAdmin && isEditingContact && (
               <div className="flex justify-end gap-2 px-5 py-3">
                 <Button
                   variant="outline"
                   onClick={handleCancelContact}
-                  disabled={!hasContactChanges || savingContact}
+                  disabled={savingContact}
                 >
                   Cancel
                 </Button>
@@ -424,49 +500,70 @@ export default function GeneralSection({
       {showInformation && (
         <Card className="shadow-none">
           <CardContent className="p-0">
-            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-5 py-3 border-b">
+            <div className="grid grid-cols-[200px_1fr] items-center gap-4 px-5 py-3">
               <div>
-                <label htmlFor="studio-timezone" className="text-sm font-medium">
-                  Studio Timezone
+                <label className="text-sm font-medium">
+                  Address
                   <span className="block text-xs text-muted-foreground">
-                  Controls how session times are shown.
+                  Primary studio address
                   </span>
                 </label>
               </div>
-              <div className="max-w-md">
-                <Select
-                  value={timezone}
-                  onValueChange={handleTimezoneChange}
-                  disabled={savingLocation || !isOwnerOrAdmin}
-                >
-                  <SelectTrigger id="studio-timezone" className={!isOwnerOrAdmin ? 'bg-muted' : ''}>
-                    <SelectValue placeholder="Select timezone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timezoneOptions.map((tz) => (
-                      <SelectItem key={tz.value} value={tz.value}>
-                        {tz.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex items-start justify-between gap-3">
+                <div className="max-w-md space-y-1">
+                  <p className="text-sm text-foreground">{addressLines.line1}</p>
+                  <p className="text-sm text-muted-foreground">{addressLines.line2}</p>
+                </div>
+                <Dialog open={isAddressModalOpen} onOpenChange={handleAddressModalChange}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleAddressModalChange(true)}
+                    disabled={!isOwnerOrAdmin || savingAddress}
+                  >
+                    Edit
+                  </Button>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Edit Address</DialogTitle>
+                      <DialogDescription>
+                        Search for the studio address. Selecting a result updates immediately.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                      <Input
+                        value={addressQuery}
+                        onChange={(event) => setAddressQuery(event.target.value)}
+                        placeholder="Search address"
+                        disabled={savingAddress}
+                      />
+                      <div className="max-h-64 overflow-auto rounded-lg border border-border/70">
+                        {filteredAddressSuggestions.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-muted-foreground">
+                            No matches yet. Try another search.
+                          </div>
+                        ) : (
+                          filteredAddressSuggestions.map((suggestion) => (
+                            <button
+                              key={suggestion.id}
+                              type="button"
+                              onClick={() => handleSelectAddress(suggestion)}
+                              disabled={savingAddress}
+                              className="flex w-full flex-col gap-1 border-b border-border/70 px-3 py-2 text-left text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60 last:border-b-0"
+                            >
+                              <span className="font-medium text-foreground">{suggestion.label}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {suggestion.city}, {suggestion.state} {suggestion.postal_code}
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
-
-            {isOwnerOrAdmin && (
-              <div className="flex justify-end gap-2 px-5 py-3">
-                <Button
-                  variant="outline"
-                  onClick={handleCancelLocation}
-                  disabled={!hasLocationChanges || savingLocation}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveLocation} disabled={!hasLocationChanges || savingLocation}>
-                  {savingLocation ? 'Saving...' : 'Save'}
-                </Button>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}

@@ -95,6 +95,11 @@ export async function updateStudio(
     logo_url?: string | null
     contact_email?: string | null
     contact_phone?: string | null
+    street?: string | null
+    city?: string | null
+    state?: string | null
+    postal_code?: string | null
+    country?: string | null
     timezone?: string | null
     default_buffer_minutes?: number
     default_session_length_hours?: number
@@ -164,6 +169,12 @@ export async function updateStudio(
     return trimmed
   }
 
+  const sanitizeAddressField = (value?: string | null) => {
+    if (value === undefined) return undefined
+    const trimmed = value?.trim() ?? ''
+    return trimmed ? trimmed : null
+  }
+
   try {
     const contactEmail = sanitizeEmail(input.contact_email)
     const contactPhone = sanitizePhone(input.contact_phone)
@@ -179,6 +190,18 @@ export async function updateStudio(
     }
     throw err
   }
+
+  const street = sanitizeAddressField(input.street)
+  const city = sanitizeAddressField(input.city)
+  const state = sanitizeAddressField(input.state)
+  const postalCode = sanitizeAddressField(input.postal_code)
+  const country = sanitizeAddressField(input.country)
+
+  if (street !== undefined) updateData.street = street
+  if (city !== undefined) updateData.city = city
+  if (state !== undefined) updateData.state = state
+  if (postalCode !== undefined) updateData.postal_code = postalCode
+  if (country !== undefined) updateData.country = country
 
   if (input.default_buffer_minutes !== undefined) {
     // Validate buffer minutes (0-60 range)

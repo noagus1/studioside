@@ -20,6 +20,11 @@ export interface Studio {
   description: string | null
   contact_email: string | null
   contact_phone: string | null
+  street: string | null
+  city: string | null
+  state: string | null
+  postal_code: string | null
+  country: string | null
   timezone: string | null
   default_buffer_minutes: number | null
   default_session_length_hours: number | null
@@ -63,6 +68,11 @@ export interface UpdateStudioInput {
   logo_url?: string | null
   contact_email?: string | null
   contact_phone?: string | null
+  street?: string | null
+  city?: string | null
+  state?: string | null
+  postal_code?: string | null
+  country?: string | null
   timezone?: string
   default_buffer_minutes?: number
   default_session_length_hours?: number
